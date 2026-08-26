@@ -7,16 +7,48 @@ Expo SDK 57 · React Native 0.86 · TypeScript (strict) · Expo Router.
 
 ## Run
 
+No Mac and no Android Studio required. Install Expo Go from the Play Store,
+then:
+
 ```bash
 npm install
-npm run ios        # or: npm run android, npm run web
+npm start          # scan the QR code with Expo Go
 ```
 
-Verification:
+Every dependency is either an Expo SDK module or react-native-svg, all of which
+ship inside Expo Go, so there is nothing to compile locally.
+
+### Installing it as a real app
+
+Expo Go is a host app, so it can't hold the screen on or hide the navigation
+bar the way an installed build can — which is most of the point of a kiosk
+clock. For that, build an APK in the cloud; still no Android Studio, no JDK,
+and no Mac:
+
+```bash
+npm install -g eas-cli
+eas login
+eas build --platform android --profile preview
+```
+
+The `preview` profile in `eas.json` produces a plain `.apk`. EAS gives you a
+download link and a QR code; install it on the phone and grant "install from
+unknown sources" when prompted.
+
+For the Play Store, `--profile production` builds an `.aab` instead.
+
+### iOS
+
+The code is platform-neutral and `expo export --platform ios` bundles clean,
+but producing an actual `.ipa` needs either a Mac or `eas build --platform ios`
+with an Apple Developer account. Nothing in the app is iOS-only; the few
+iOS-specific style properties (`borderCurve`) are silently ignored elsewhere.
+
+### Verification
 
 ```bash
 npm run typecheck  # tsc --noEmit
-npm run bundle     # real Metro bundle; catches what typechecking cannot
+npm run bundle     # real Metro bundle for iOS, Android and web
 ```
 
 ## What it does
@@ -65,6 +97,19 @@ plausible numbers is worse than no source:
 | `sample` | no endpoint configured; demo data by design | grey "sample" |
 | `stale` | an endpoint is configured but the call failed | amber "stale" |
 
+## Platform notes
+
+The clock's numerals use `fontVariant: ['tabular-nums']` so digits keep a fixed
+advance width and the time doesn't shift as it ticks. This is often described
+as iOS-only; it is not. React Native 0.86 maps it to
+`Paint.setFontFeatureSettings("'tnum'")` on Android, so the behaviour is the
+same on both.
+
+On Android the kiosk screen hides the system navigation bar while it is
+focused, and restores it when settings opens so the app stays navigable.
+`borderCurve: 'continuous'` (Apple's squircle corners) is iOS-only and degrades
+to ordinary rounded corners elsewhere.
+
 ## Layout
 
 ```
@@ -106,7 +151,7 @@ exists.
 
 ## Verified
 
-`tsc --noEmit` clean and `expo export` clean on both iOS and web.
+`tsc --noEmit` clean, and `expo export` clean for iOS, Android and web.
 
 Driven end to end in a browser against the real web build (Chromium/Playwright,
 393×852, zero console errors): tap → reveal → settings → pick each of the four
@@ -122,5 +167,10 @@ faces → Done → back to kiosk.
 - Endpoint debounce measured: 22 keystrokes produce 2 requests, not 22.
 
 Not verified: behaviour on physical hardware. Keep-awake, haptics, orientation
-lock and the native switch/modal appearance are all real native modules that a
-browser cannot exercise — they need a device or simulator.
+lock, hiding the Android navigation bar, and the native switch/modal appearance
+are all real native modules that a browser cannot exercise — they need a device
+or an emulator.
+
+Also not done: the launcher icon is still Expo's scaffold artwork on a black
+background. Replace `assets/icon.png` and
+`assets/android-icon-foreground.png` to fix it.

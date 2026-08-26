@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -9,9 +10,10 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import { NavigationBar } from 'expo-navigation-bar';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { longDate } from '@/core/format';
@@ -58,6 +60,17 @@ export function KioskScreen() {
       deactivateKeepAwake(KEEP_AWAKE_TAG).catch(() => {});
     };
   }, [settings.keepAwake]);
+
+  // Android draws a system navigation bar over the bottom of the screen, which
+  // a full-bleed clock should not have to share. Tied to focus rather than
+  // mount: the bar comes back when settings opens, so navigation still works.
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS !== 'android') return;
+      NavigationBar.setHidden(true);
+      return () => NavigationBar.setHidden(false);
+    }, []),
+  );
 
   useEffect(() => {
     ScreenOrientation.lockAsync(
