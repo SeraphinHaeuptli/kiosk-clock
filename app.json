@@ -1,13 +1,14 @@
 {
   "expo": {
-    "name": "kiosk-clock",
+    "name": "Kiosk",
     "slug": "kiosk-clock",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.kioskclock.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -16,10 +17,18 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.kioskclock.app"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "static"
+    },
+    "scheme": "kiosk",
+    "backgroundColor": "#000000",
+    "plugins": [
+      "expo-router"
+    ]
   }
 }

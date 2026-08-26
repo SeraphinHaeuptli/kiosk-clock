@@ -39,3 +39,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# local build output from `npm run bundle` / expo export
+.expo-bundle/
+.expo-web/
