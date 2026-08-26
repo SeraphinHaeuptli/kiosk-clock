@@ -20,10 +20,11 @@ ship inside Expo Go, so there is nothing to compile locally.
 
 ### Installing it as a real app
 
-Expo Go is a host app, so it can't hold the screen on or hide the navigation
-bar the way an installed build can — which is most of the point of a kiosk
-clock. For that, build an APK in the cloud; still no Android Studio, no JDK,
-and no Mac:
+Every native feature here — keep-awake, hiding the navigation bar, orientation
+lock, haptics — works inside Expo Go. The catch is that Expo Go loads the app
+from the Metro server on your computer, so the phone needs your machine awake
+and on the same network. For a clock meant to sit on a nightstand for days,
+build a standalone APK instead; still no Android Studio, no JDK and no Mac:
 
 ```bash
 npm install -g eas-cli
