@@ -7,24 +7,41 @@ Expo SDK 57 · React Native 0.86 · TypeScript (strict) · Expo Router.
 
 ## Run
 
-No Mac and no Android Studio required. Install Expo Go from the Play Store,
-then:
+Everything below works from Linux or Windows. Nothing here needs a Mac, and
+nothing needs an app store.
+
+### On the computer itself
 
 ```bash
 npm install
-npm start          # scan the QR code with Expo Go
+npm run web
 ```
 
-Every dependency is either an Expo SDK module or react-native-svg, all of which
-ship inside Expo Go, so there is nothing to compile locally.
+Opens in the browser; press F11 for fullscreen. Web is a checked target, not an
+afterthought — it is exported and verified alongside iOS and Android — so this
+is the quickest way to put the clock on a spare monitor or a Linux desktop.
 
-### Installing it as a real app
+### On an Android phone, with Expo Go
 
-Every native feature here — keep-awake, hiding the navigation bar, orientation
-lock, haptics — works inside Expo Go. The catch is that Expo Go loads the app
-from the Metro server on your computer, so the phone needs your machine awake
-and on the same network. For a clock meant to sit on a nightstand for days,
-build a standalone APK instead; still no Android Studio, no JDK and no Mac:
+```bash
+npm start          # then scan the QR code
+```
+
+Expo Go is usually installed from the Play Store, but it does not have to be:
+Expo publishes the APK for direct download at
+[expo.dev/go](https://expo.dev/go), selectable by SDK version — pick SDK 57 to
+match this project. Install it by opening the file on the phone, or over USB
+with `adb install expo-go-*.apk`. On Debian or Ubuntu, `adb` comes from
+`sudo apt install android-tools-adb`; on Arch, `pacman -S android-tools`.
+
+Every dependency here is an Expo SDK module or react-native-svg, all of which
+ship inside Expo Go, so nothing is compiled locally.
+
+### As a standalone APK, with no Expo Go at all
+
+Expo Go loads the app from the Metro server on your computer, which is no good
+for a clock meant to run unattended. A standalone build has no such tie. Still
+no Android Studio, no JDK and no Mac — it compiles in Expo's cloud:
 
 ```bash
 npm install -g eas-cli
@@ -32,18 +49,24 @@ eas login
 eas build --platform android --profile preview
 ```
 
-The `preview` profile in `eas.json` produces a plain `.apk`. EAS gives you a
-download link and a QR code; install it on the phone and grant "install from
-unknown sources" when prompted.
+The `preview` profile in `eas.json` produces a plain `.apk`. EAS returns a
+download link and a QR code; install it on the phone and allow "install from
+unknown sources" when prompted. `--profile production` builds an `.aab` for the
+Play Store instead.
 
-For the Play Store, `--profile production` builds an `.aab` instead.
+### On an Android emulator under Linux
+
+Install Android Studio, or just the command-line tools, then create an AVD and
+boot it. `npm run android` picks up any running emulator or any USB device with
+debugging enabled. Hardware acceleration needs KVM — check with
+`kvm-ok` (from `cpu-checker`) and make sure your user is in the `kvm` group.
 
 ### iOS
 
 The code is platform-neutral and `expo export --platform ios` bundles clean,
-but producing an actual `.ipa` needs either a Mac or `eas build --platform ios`
-with an Apple Developer account. Nothing in the app is iOS-only; the few
-iOS-specific style properties (`borderCurve`) are silently ignored elsewhere.
+but producing an `.ipa` needs a Mac or `eas build --platform ios` with an Apple
+Developer account. Nothing in the app is iOS-only; the iOS-specific style
+properties (`borderCurve`) are silently ignored elsewhere.
 
 ### Verification
 
@@ -157,6 +180,10 @@ exists.
 Driven end to end in a browser against the real web build (Chromium/Playwright,
 393×852, zero console errors): tap → reveal → settings → pick each of the four
 faces → Done → back to kiosk.
+
+Layout checked at 1920×1080, 852×393 (landscape) and 393×852 (portrait). The
+usage meter caps at 560px and centres on the wider two rather than stretching
+its label to one edge and its value to the other.
 
 - Word-clock phrasing checked at every boundary, including the hour rollover at
   :58 (23:58 → "it is twelve o'clock"); longest line measured at 301px against a

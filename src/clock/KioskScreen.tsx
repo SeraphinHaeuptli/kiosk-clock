@@ -33,6 +33,12 @@ import { isNight } from './settings';
 const KEEP_AWAKE_TAG = 'kiosk-clock';
 const CHROME_TIMEOUT_MS = 4_000;
 const NIGHT_OPACITY = 0.45;
+/**
+ * The face scales with the display, but the usage meter is a fixed-density
+ * readout: stretched across a landscape phone or a desktop it strands its
+ * label at one edge and its value at the other.
+ */
+const METER_MAX_WIDTH = 560;
 
 export function KioskScreen() {
   const { settings, accent, ready } = useSettings();
@@ -160,7 +166,7 @@ export function KioskScreen() {
           styles.content,
           {
             paddingTop: insets.top + space.md,
-            paddingBottom: insets.bottom + space.lg,
+            paddingBottom: insets.bottom + space.xl,
             paddingHorizontal: space.xl,
           },
         ]}
@@ -203,7 +209,10 @@ export function KioskScreen() {
         </Animated.View>
 
         {settings.showUsage && (
-          <Animated.View pointerEvents="none" style={{ opacity: dim }}>
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.meter, { opacity: dim }]}
+          >
             <UsageBar result={usage.result} accentColor={accent.color} />
           </Animated.View>
         )}
@@ -228,6 +237,7 @@ const styles = StyleSheet.create({
   },
   controlButtonPressed: { opacity: 0.55 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  meter: { width: '100%', maxWidth: METER_MAX_WIDTH, alignSelf: 'center' },
   faceBlock: { alignItems: 'center' },
   date: {
     ...type.callout,
