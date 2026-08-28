@@ -247,6 +247,7 @@ export default function SettingsScreen() {
           title="source"
           value={sourceStatus(nowPlaying.result?.mode, nowPlaying.result?.warning)}
         />
+        <StatusRow title="on this device" value={nowPlaying.source.reason} />
         <Text style={styles.note}>{AUDIO_HINT}</Text>
 
         <Heading>reset</Heading>

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { timeParts } from '@/core/format';
@@ -37,7 +38,11 @@ const LINE_RATIO = 0.85;
  */
 export function AsciiFace({ now, settings, tone, size }: FaceProps) {
   const { hours, minutes, seconds, suffix } = timeParts(now, settings.hour12);
-  const lines = artRows(`${hours}:${minutes}`);
+
+  // Keyed on the rendered time, not the Date: with seconds shown the component
+  // re-renders every second, but the art only changes once a minute.
+  const clock = `${hours}:${minutes}`;
+  const lines = useMemo(() => artRows(clock), [clock]);
 
   const fontSize = (size * BLOCK_WIDTH_RATIO) / (MAX_COLUMNS * MONO_ASPECT);
 

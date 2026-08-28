@@ -8,6 +8,7 @@ import {
   Text,
   useWindowDimensions,
   View,
+  type LayoutChangeEvent,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
@@ -33,6 +34,7 @@ import { useVolume } from '@/media/useVolume';
 import { Backdrop } from './Backdrop';
 import { BurnInGuard } from './BurnInGuard';
 import { ClockFace } from './ClockFace';
+import { faceOf } from './faces';
 import { useSettings } from './SettingsContext';
 import { isNight } from './settings';
 
@@ -51,6 +53,12 @@ const METER_MAX_WIDTH = 560;
  * hour instead of once a second alongside the clock.
  */
 const LIGHT_STEPS = 48;
+/** Share of the available box a face may occupy, leaving it room to breathe. */
+const FACE_FILL = 0.94;
+/** Height the date line and its margin take out of that box. */
+const DATE_ALLOWANCE = 44;
+/** Floor, so a very short box still renders something legible. */
+const MIN_FACE_SIZE = 14;
 
 export function KioskScreen() {
   const { settings, tone, ready } = useSettings();
@@ -164,9 +172,24 @@ export function KioskScreen() {
 
   /* -- Layout -------------------------------------------------------------- */
 
-  // One number drives every face's typography, derived from the shorter axis so
-  // the face fits in portrait and landscape alike.
-  const faceSize = Math.min(width * 0.28, height * 0.3);
+  // Measured rather than derived from the window: the face has to fit the box
+  // left over after the header, the date and the audio bar, which is what
+  // actually ran out in landscape.
+  const [box, setBox] = useState({ width: width, height: height * 0.45 });
+  const onCenterLayout = (event: LayoutChangeEvent) => {
+    const { width: w, height: h } = event.nativeEvent.layout;
+    if (w > 0 && h > 0) setBox({ width: w, height: h });
+  };
+
+  const face = faceOf(settings.face);
+  const dateAllowance = settings.showDate ? DATE_ALLOWANCE : 0;
+  const faceSize = Math.max(
+    MIN_FACE_SIZE,
+    Math.min(
+      (box.width * FACE_FILL) / face.widthRatio,
+      ((box.height - dateAllowance) * FACE_FILL) / face.heightRatio,
+    ),
+  );
 
   if (!ready) return <View style={styles.root} />;
 
@@ -229,6 +252,7 @@ export function KioskScreen() {
 
         <Animated.View
           pointerEvents="none"
+          onLayout={onCenterLayout}
           style={[styles.center, { opacity: dim }]}
         >
           <BurnInGuard enabled={settings.burnInGuard} style={styles.faceBlock}>

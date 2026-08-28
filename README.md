@@ -154,10 +154,29 @@ Settings → now playing → endpoint or via `EXPO_PUBLIC_NOW_PLAYING_ENDPOINT`
 from a `status` field. The usual source is a small wrapper around `playerctl`
 or MPRIS on whichever machine is actually playing the audio.
 
-Reading another app's media session **on the device itself** is not wired up.
-Android needs a `NotificationListenerService` and a permission the user grants
-in system settings; iOS does not expose other apps' now-playing at all. The
-endpoint is the portable answer.
+### Why there is no on-device source
+
+The app resolves the best available source per platform on launch and reports
+which one it picked, in Settings → now playing → on this device. The honest
+answer differs sharply, and only one platform can do it at all:
+
+**Android can.** `MediaSessionManager.getActiveSessions` reports every active
+media session, but it is gated behind `BIND_NOTIFICATION_LISTENER_SERVICE` —
+the Notification Access grant that scrobblers and lock-screen replacements ask
+for, which the user must enable in system settings. It needs a native service
+declared in the manifest, so it is not something a JavaScript-only build can
+switch on. The packages that wrap it are all several years stale and predate
+the current React Native architecture, so none is wired in here.
+
+**iOS cannot, at all.** `MPNowPlayingInfoCenter` is write-only — it publishes
+what *your* app plays. `MPMusicPlayerController` reads only the built-in Music
+app, not Spotify or anything else. Reading another app's session means the
+private MediaRemote framework, which is not permitted on the App Store.
+
+**Browsers cannot** read system media sessions either.
+
+So the endpoint is the portable answer on every platform, and pointing it at
+the machine actually playing the audio is the intended arrangement.
 
 Provenance is always visible, because a broken source that silently shows
 nothing is indistinguishable from silence:
@@ -191,6 +210,10 @@ being asked for, so per-row elements drift apart and the block outgrows any
 height computed for it. The row pitch is also set slightly below the font size
 so consecutive rows of ink overlap — at full pitch the vertical strokes break
 into dashes.
+
+The face is memoised, and the character art is memoised on the time it renders
+rather than on the `Date`. The screen re-renders on every frame of a volume
+drag, and without both the art rebuilt a five-thousand-glyph string per frame.
 
 Both system bars are re-asserted whenever the window changes shape. Hiding them
 once when the screen gains focus is not enough: Android restores them on a
@@ -249,7 +272,11 @@ exists.
 
 - Adding a face means adding one entry to `src/clock/faces/index.ts`. Nothing
   else needs to change: the picker, the kiosk and persistence all read the
-  registry.
+  registry. That entry declares the face's own proportions, because faces
+  differ enormously — the stacked face is over three times taller than its base
+  size, the digital face barely one — and the screen sizes each from the box it
+  measured rather than from a single screen-derived guess. Getting this wrong
+  is what made the tall faces overflow in landscape.
 - Settings loaded from disk go through `decodeSettings`, which falls back to
   defaults per field. Stored data outlives the schema that wrote it — including
   settings naming faces, backdrops or accent colours that no longer exist.
@@ -272,8 +299,12 @@ back to kiosk, plus switching tone and cycling every backdrop. Re-run at
 - Word-clock phrasing checked at every boundary, including the hour rollover at
   :58 (23:58 → "it is twelve o'clock"); longest line measured at 268px against
   a 375px viewport, so it cannot overflow.
-- Layout checked at 1920x1080, 852x393 (landscape) and 393x852 (portrait). The
-  usage meter caps at 560px and centres on the wider two.
+- Every face measured for overflow at 852x393, 393x852 and 760x360 (a Galaxy
+  S10 in landscape): all five fit, with the only remaining overflow being the
+  wave field itself, which is deliberately oversized inside a clipping
+  container so it covers the screen edge to edge.
+- The audio bar caps at 560px and centres on wide displays; a browser drag
+  moves the level and clamps at both ends.
 - Usage connector exercised against a live local endpoint: `used: 124,
   limit: 200` rendered as 62%, and an unreachable endpoint fell back to sample
   data flagged `[stale]` rather than failing.

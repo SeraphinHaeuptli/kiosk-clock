@@ -4,6 +4,7 @@ import { AppState } from 'react-native';
 import { useDebounced } from '@/core/useDebounced';
 
 import { loadNowPlaying, type NowPlayingResult } from './nowPlaying';
+import { chooseSource, type SourceChoice } from './nowPlayingSource';
 
 /** Tracks change often, so poll on the order of seconds. */
 const REFRESH_MS = 10_000;
@@ -22,6 +23,7 @@ export function useNowPlaying(endpoint: string, enabled: boolean) {
   const [result, setResult] = useState<NowPlayingResult | null>(null);
   const generation = useRef(0);
   const settled = useDebounced(endpoint, ENDPOINT_SETTLE_MS);
+  const source: SourceChoice = chooseSource(settled);
 
   const refresh = useCallback(() => {
     if (!enabled) return;
@@ -51,5 +53,5 @@ export function useNowPlaying(endpoint: string, enabled: boolean) {
     };
   }, [refresh, enabled]);
 
-  return { result, refresh };
+  return { result, source, refresh };
 }
