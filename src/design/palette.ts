@@ -4,7 +4,7 @@
  * so colour carries no meaning here and never has to be decoded.
  */
 
-export type ToneId = 'white' | 'amber' | 'green';
+export type ToneId = 'white' | 'amber' | 'green' | 'claude';
 
 export interface Tone {
   id: ToneId;
@@ -15,11 +15,15 @@ export interface Tone {
   dim: string;
 }
 
-/** The three phosphors: paper-white, IBM amber, and P1 green. */
+/**
+ * Three phosphors — paper-white, IBM amber, P1 green — plus Anthropic's
+ * official accent orange, #d97757.
+ */
 export const TONES: readonly Tone[] = [
   { id: 'white', name: 'white', color: '#E8E8E8', dim: 'rgba(232,232,232,0.45)' },
   { id: 'amber', name: 'amber', color: '#FFB000', dim: 'rgba(255,176,0,0.45)' },
   { id: 'green', name: 'green', color: '#33FF66', dim: 'rgba(51,255,102,0.45)' },
+  { id: 'claude', name: 'claude', color: '#D97757', dim: 'rgba(217,119,87,0.45)' },
 ];
 
 export function toneOf(id: ToneId): Tone {

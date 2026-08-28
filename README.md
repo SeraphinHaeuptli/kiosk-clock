@@ -38,22 +38,29 @@ with `adb install expo-go-*.apk`. On Debian or Ubuntu, `adb` comes from
 Every dependency here is an Expo SDK module or react-native-svg, all of which
 ship inside Expo Go, so nothing is compiled locally.
 
-### As a standalone APK, with no Expo Go at all
+### As a standalone APK, straight from GitHub
 
 Expo Go loads the app from the Metro server on your computer, which is no good
-for a clock meant to run unattended. A standalone build has no such tie. Still
-no Android Studio, no JDK and no Mac — it compiles in Expo's cloud:
+for a clock meant to run unattended. A standalone build has no such tie.
 
-```bash
-npm install -g eas-cli
-eas login
-eas build --platform android --profile preview
-```
+The `Android APK` workflow builds one for you. Open the repository's **Actions**
+tab, pick **Android APK**, and press **Run workflow**. When it finishes,
+download the `kiosk-apk` artifact from the run, unzip it, and open the `.apk` on
+the phone — allow "install from unknown sources" when prompted. Tagging a
+commit `v*` builds one too.
 
-The `preview` profile in `eas.json` produces a plain `.apk`. EAS returns a
-download link and a QR code; install it on the phone and allow "install from
-unknown sources" when prompted. `--profile production` builds an `.aab` for the
-Play Store instead.
+No Expo account, no Android Studio, no JDK and no Mac: GitHub's runners already
+carry the Android SDK. The APK is universal, so it installs on any modern
+Android device including arm64 handsets like the Galaxy S10.
+
+It is signed with the debug keystore that `expo prebuild` generates — which is
+what the React Native template configures for release builds, and is fine for
+sideloading. It is *not* fit for the Play Store, and because the keystore is
+regenerated per run you cannot upgrade one build over another; uninstall first.
+
+If you would rather build in Expo's cloud and have an account, `eas.json` still
+carries the profiles: `eas build --platform android --profile preview` for an
+APK, `--profile production` for a Play Store `.aab`.
 
 ### On an Android emulator under Linux
 
@@ -78,16 +85,17 @@ npm run bundle     # real Metro bundle for iOS, Android and web
 
 ## What it does
 
-**Five faces.** ASCII (the time on a 5x7 character grid), Digital, Stack
+**Five faces.** ASCII (the time as character art — roughly two and a half
+thousand small glyphs arranged into the digits), Digital, Stack
 (hours over minutes, readable across a room), Analog (a minimal dial), and
 Words ("it is twenty-five past three"). Each is one component that scales from
 a single `size` prop, so the settings picker previews the real face rather than
 a drawing of it.
 
-**One ink colour.** White by default, with amber and green available — the
-three phosphors. Colour carries no meaning anywhere in the interface, so
-nothing has to be decoded; state is shown with brackets, rules and inverse
-video instead.
+**One ink colour.** White by default, with amber and green — the phosphors —
+and Claude's own `#d97757`. Colour carries no meaning anywhere in the
+interface, so nothing has to be decoded; state is shown with brackets, rules
+and inverse video instead.
 
 **Backdrops that follow the sun.** `void` is plain black. The other three read
 a single continuous daylight value — 0 at midnight, 1 at midday, on a cosine —
@@ -97,9 +105,9 @@ its character field toward midday and thins to a dusting overnight.
 
 **Kiosk behaviours.** Keep-awake, night dimming between 10 PM and 7 AM,
 burn-in protection that drifts the face a few points on a slow cycle, a
-landscape lock for a dock or stand, and on Android the system navigation bar
-is hidden while the clock is up. Tap anywhere for the settings button; it
-fades out again after four seconds.
+landscape lock for a dock or stand, and both system bars — status and
+navigation — hidden while the clock is up, re-asserted on every rotation.
+Tap anywhere for the settings button; it fades out again after four seconds.
 
 **Usage meter.** The rolling five-hour Claude session allowance as a character
 bar sized to the space available, with a countdown to reset and the weekly
@@ -133,11 +141,23 @@ plausible numbers is worse than no source:
 
 ## Platform notes
 
-The ASCII face authors its glyphs as strings of `#` and ` `, but paints each
-inked run as a rectangle rather than setting block characters. The metrics of
-U+2588 vary by font and platform, and where the glyph is shorter than its line
-box the strokes break into disconnected chips — drawing the cells makes the
-result identical everywhere.
+The ASCII face authors its digits as a 5x7 grid of `#` and ` `, then subdivides
+each cell into a patch of small characters chosen by how buried the cell is in
+the shape. Every character it uses is plain ASCII, so there is no exotic glyph
+to fall back on.
+
+The whole block is one `Text` holding newline-separated rows, not one `Text`
+per row. Each element carries its own line box whose height comes from the
+font's ascent and descent; at this size that is taller than the line height
+being asked for, so per-row elements drift apart and the block outgrows any
+height computed for it. The row pitch is also set slightly below the font size
+so consecutive rows of ink overlap — at full pitch the vertical strokes break
+into dashes.
+
+Both system bars are re-asserted whenever the window changes shape. Hiding them
+once when the screen gains focus is not enough: Android restores them on a
+configuration change, so rotating the device — or toggling the landscape lock,
+which rotates it — brings them straight back.
 
 Everything else is set in the platform monospace face (Menlo on iOS,
 `monospace` on Android). Numerals additionally carry
@@ -199,7 +219,8 @@ exists.
 
 Driven end to end in a browser against the real web build (Chromium/Playwright,
 zero console errors): tap → reveal → settings → each of the five faces → Done →
-back to kiosk, plus switching tone and cycling every backdrop.
+back to kiosk, plus switching tone and cycling every backdrop. Re-run at
+852x393 to confirm every face survives landscape.
 
 - Rendered at two times of day to confirm the backdrops actually differ:
   `stars` invisible at midday and dense at night, `dither` inverted.
@@ -213,10 +234,13 @@ back to kiosk, plus switching tone and cycling every backdrop.
   data flagged `[stale]` rather than failing.
 - Endpoint debounce measured: 22 keystrokes produce 2 requests, not 22.
 
-Not verified: behaviour on physical hardware. Keep-awake, haptics, orientation
-lock, hiding the Android navigation bar, and the native modal and alert
-appearance are all real native modules that a browser cannot exercise — they
-need a device or an emulator.
+Not verified: behaviour on physical hardware, and the APK workflow itself,
+which has never been executed — this repository's Actions runs are the first
+time it will have run anywhere. Keep-awake, haptics, orientation lock, hiding
+the system bars and the native modal and alert appearance are all real native
+modules a browser cannot exercise. The signing path was checked by generating
+the native project and reading the release `signingConfig`, not by producing
+an APK.
 
 Also not done: the launcher icon is still Expo's scaffold artwork on a black
 background. Replace `assets/icon.png` and

@@ -1,0 +1,54 @@
+# Builds an installable APK and attaches it to the run as a downloadable
+# artifact. Run it from the Actions tab ("Run workflow"), then download
+# "kiosk-apk" from the finished run.
+#
+# No Expo account, no Android Studio and no local JDK are needed: GitHub's
+# runners already carry the Android SDK.
+
+name: Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  apk:
+    name: Build APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      # android/ is generated rather than committed, so it can never drift
+      # from app.json.
+      - name: Generate the native project
+        run: npx expo prebuild --platform android --no-install
+
+      # The React Native template signs release builds with the debug keystore
+      # that prebuild generates. That is not fit for the Play Store, but it
+      # produces an APK that installs by sideloading, which is the point here.
+      - name: Assemble release APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kiosk-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error

@@ -3,6 +3,7 @@ import {
   Animated,
   Platform,
   Pressable,
+  StatusBar as SystemStatusBar,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -73,16 +74,29 @@ export function KioskScreen() {
     };
   }, [settings.keepAwake]);
 
-  // Android draws a system navigation bar over the bottom of the screen, which
-  // a full-bleed clock should not have to share. Tied to focus rather than
-  // mount: the bar comes back when settings opens, so navigation still works.
+  // Android draws system bars over a full-bleed clock, which it should not
+  // have to share. Tied to focus rather than mount: they come back when
+  // settings opens, so the app stays navigable.
   useFocusEffect(
     useCallback(() => {
-      if (Platform.OS !== 'android') return;
-      NavigationBar.setHidden(true);
-      return () => NavigationBar.setHidden(false);
+      SystemStatusBar.setHidden(true, 'fade');
+      if (Platform.OS === 'android') NavigationBar.setHidden(true);
+
+      return () => {
+        SystemStatusBar.setHidden(false, 'fade');
+        if (Platform.OS === 'android') NavigationBar.setHidden(false);
+      };
     }, []),
   );
+
+  // Hiding once on focus is not enough. Android restores the system bars when
+  // the window changes configuration, so rotating the device — or flipping the
+  // landscape lock, which rotates it — brings them straight back. Re-assert
+  // whenever the window changes shape.
+  useEffect(() => {
+    SystemStatusBar.setHidden(true, 'fade');
+    if (Platform.OS === 'android') NavigationBar.setHidden(true);
+  }, [width, height, settings.landscape]);
 
   useEffect(() => {
     ScreenOrientation.lockAsync(
@@ -152,7 +166,7 @@ export function KioskScreen() {
 
   return (
     <View style={styles.root}>
-      <StatusBar hidden style="light" />
+      <StatusBar style="light" />
 
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: dim }]}>
         <Backdrop
