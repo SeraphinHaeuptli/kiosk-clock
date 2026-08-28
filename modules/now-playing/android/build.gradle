@@ -6,6 +6,16 @@ plugins {
 group = 'com.kioskclock.nowplaying'
 version = '0.1.0'
 
+// The module lives in this repo and is compiled from source, so there is
+// nothing to publish to a Maven repository.
+expoModule {
+  canBePublished false
+}
+
 android {
   namespace "expo.modules.nowplaying"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
 }
