@@ -28,6 +28,12 @@ jobs:
 
       - run: npm ci
 
+      # Cheap gate before the expensive one. A native package that drifts from
+      # the SDK's pins fails as a C++ error minutes into the Gradle build;
+      # this catches it in about a second.
+      - name: Check native dependency versions
+        run: npm run check:native
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
