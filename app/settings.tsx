@@ -5,7 +5,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FacePicker } from '@/clock/FacePicker';
 import { useSettings } from '@/clock/SettingsContext';
-import type { BackdropId } from '@/clock/settings';
+import type {
+  BackdropId,
+  BackdropTone,
+  WaveScale,
+  WaveSpeed,
+} from '@/clock/settings';
 import { useNow } from '@/core/useNow';
 import { TONES, label, surface, type ToneId } from '@/design/palette';
 import { space, type } from '@/design/tokens';
@@ -25,6 +30,25 @@ const BACKDROPS: readonly Choice<BackdropId>[] = [
   { id: 'horizon', name: 'horizon' },
   { id: 'stars', name: 'stars' },
   { id: 'dither', name: 'dither' },
+  { id: 'wave', name: 'wave' },
+];
+
+const WAVE_SPEEDS: readonly Choice<WaveSpeed>[] = [
+  { id: 'still', name: 'still' },
+  { id: 'slow', name: 'slow' },
+  { id: 'medium', name: 'medium' },
+  { id: 'fast', name: 'fast' },
+];
+
+const WAVE_SCALES: readonly Choice<WaveScale>[] = [
+  { id: 'fine', name: 'fine' },
+  { id: 'medium', name: 'medium' },
+  { id: 'coarse', name: 'coarse' },
+];
+
+const BACKDROP_TONES: readonly Choice<BackdropTone>[] = [
+  { id: 'match', name: 'match' },
+  ...TONES.map((t) => ({ id: t.id as BackdropTone, name: t.name })),
 ];
 
 const TONE_CHOICES: readonly Choice<ToneId>[] = TONES.map((tone) => ({
@@ -113,8 +137,42 @@ export default function SettingsScreen() {
           tone={tone}
         />
         <Text style={styles.note}>
-          horizon, stars and dither all shift with the time of day.
+          horizon, stars and dither shift with the time of day. wave is a
+          perlin noise field with its own controls.
         </Text>
+
+        <ChoiceRow
+          options={BACKDROP_TONES}
+          value={settings.backdropTone}
+          onChange={(backdropTone) => update({ backdropTone })}
+          tone={tone}
+        />
+        <Text style={styles.note}>
+          backdrop colour. match follows the clock's tone.
+        </Text>
+
+        {settings.backdrop === 'wave' && (
+          <>
+            <Heading>wave speed</Heading>
+            <ChoiceRow
+              options={WAVE_SPEEDS}
+              value={settings.waveSpeed}
+              onChange={(waveSpeed) => update({ waveSpeed })}
+              tone={tone}
+            />
+
+            <Heading>wave noise</Heading>
+            <ChoiceRow
+              options={WAVE_SCALES}
+              value={settings.waveScale}
+              onChange={(waveScale) => update({ waveScale })}
+              tone={tone}
+            />
+            <Text style={styles.note}>
+              fine is tight and busy; coarse rolls in broad bands.
+            </Text>
+          </>
+        )}
 
         <Heading>display</Heading>
         <CheckRow

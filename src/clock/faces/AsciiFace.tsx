@@ -13,8 +13,13 @@ import type { FaceProps } from './types';
  * and go — a clock that changed size between 09:59 and 10:00 would be unusable.
  */
 const MAX_COLUMNS = artColumns('00:00');
-/** How many multiples of the base size that widest block should span. */
-const BLOCK_WIDTH_RATIO = 3.15;
+/**
+ * How many multiples of the base size the widest block should span. Kept a
+ * little under what would fill the screen: the layout assumes a 0.6 advance
+ * width, and if the real font is a hair wider the Text wraps and the glyphs
+ * are destroyed rather than merely clipped.
+ */
+const BLOCK_WIDTH_RATIO = 2.95;
 /**
  * Row pitch as a fraction of font size. Below 1 so consecutive rows of ink
  * overlap slightly: at full pitch the vertical strokes break into dashes,

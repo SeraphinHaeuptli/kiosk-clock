@@ -41,24 +41,43 @@ ship inside Expo Go, so nothing is compiled locally.
 ### As a standalone APK, straight from GitHub
 
 Expo Go loads the app from the Metro server on your computer, which is no good
-for a clock meant to run unattended. A standalone build has no such tie.
+for a clock meant to run unattended. A standalone build has no such tie, and
+you need nothing installed locally to get one — GitHub's runners already carry
+the Android SDK.
 
-The `Android APK` workflow builds one for you. Open the repository's **Actions**
-tab, pick **Android APK**, and press **Run workflow**. When it finishes,
-download the `kiosk-apk` artifact from the run, unzip it, and open the `.apk` on
-the phone — allow "install from unknown sources" when prompted. Tagging a
-commit `v*` builds one too.
+**Tag a release** and the APK is attached to it, downloadable as a plain URL
+the phone can install from directly:
 
-No Expo account, no Android Studio, no JDK and no Mac: GitHub's runners already
-carry the Android SDK. The APK is universal, so it installs on any modern
-Android device including arm64 handsets like the Galaxy S10.
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+**Or run it on demand**: Actions tab → *Android APK* → *Run workflow*, then
+download the `kiosk-apk` artifact from the finished run. That arrives as a
+`.zip`, so it needs unzipping first — the release route is easier on a phone.
+
+Either way, open the `.apk` on the device and allow "install from unknown
+sources". The build is universal, so it installs on any modern Android device
+including arm64 handsets like the Galaxy S10.
 
 It is signed with the debug keystore that `expo prebuild` generates — which is
 what the React Native template configures for release builds, and is fine for
 sideloading. It is *not* fit for the Play Store, and because the keystore is
 regenerated per run you cannot upgrade one build over another; uninstall first.
 
-If you would rather build in Expo's cloud and have an account, `eas.json` still
+### Building the APK yourself
+
+With a JDK 17+ and an Android SDK installed:
+
+```bash
+./scripts/build-apk.sh
+```
+
+It checks the toolchain, verifies native dependency versions, regenerates the
+native project and assembles the APK into `kiosk-clock.apk`. If a prerequisite
+is missing it says exactly what to install.
+
+If you have an Expo account and would rather build in their cloud, `eas.json`
 carries the profiles: `eas build --platform android --profile preview` for an
 APK, `--profile production` for a Play Store `.aab`.
 
@@ -97,11 +116,17 @@ and Claude's own `#d97757`. Colour carries no meaning anywhere in the
 interface, so nothing has to be decoded; state is shown with brackets, rules
 and inverse video instead.
 
-**Backdrops that follow the sun.** `void` is plain black. The other three read
-a single continuous daylight value — 0 at midnight, 1 at midday, on a cosine —
-so they drift rather than switch: `horizon` brightens overhead through the
-day, `stars` come out after dark and are gone by noon, and `dither` thickens
-its character field toward midday and thins to a dusting overnight.
+**Five backdrops.** `void` is plain black. Three read a single continuous
+daylight value — 0 at midnight, 1 at midday, on a cosine — so they drift
+rather than switch: `horizon` brightens overhead through the day, `stars` come
+out after dark and are gone by noon, and `dither` thickens its character field
+toward midday and thins to a dusting overnight.
+
+`wave` is a drifting field of 2D Perlin noise rendered as characters, with its
+own controls: speed (including *still*), noise frequency from fine to coarse,
+and a colour that either follows the clock's tone or overrides it. Speed
+changes how far the field advances per frame rather than how often it redraws,
+so the cost of the animation is flat however fast it looks.
 
 **Kiosk behaviours.** Keep-awake, night dimming between 10 PM and 7 AM,
 burn-in protection that drifts the face a few points on a slow cycle, a
@@ -179,7 +204,7 @@ app/                    Routes only — thin wrappers around screens
 src/
   design/               Tokens and the monochrome palette
   core/                 useNow, daylight, formatting, storage port,
-                        seeded noise, useDebounced
+                        seeded noise, 2D Perlin, useDebounced
   clock/
     settings.ts         Domain: ClockSettings, defaults, decode
     SettingsContext.tsx State + debounced persistence

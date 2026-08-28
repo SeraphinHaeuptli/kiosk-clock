@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { daylight } from '@/core/daylight';
 import { longDate } from '@/core/format';
 import { useNow } from '@/core/useNow';
-import { label, surface } from '@/design/palette';
+import { label, surface, toneOf } from '@/design/palette';
 import { duration, hairline, space, type } from '@/design/tokens';
 import { MenuGlyph } from '@/ui/Terminal';
 import { UsageBar } from '@/usage/UsageBar';
@@ -171,8 +171,16 @@ export function KioskScreen() {
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: dim }]}>
         <Backdrop
           backdrop={settings.backdrop}
-          tone={tone}
+          // Resolved here rather than inside the backdrop, so the backdrop
+          // never needs to know the clock's own tone exists.
+          tone={
+            settings.backdropTone === 'match'
+              ? tone
+              : toneOf(settings.backdropTone)
+          }
           light={Math.round(daylight(now) * LIGHT_STEPS) / LIGHT_STEPS}
+          waveSpeed={settings.waveSpeed}
+          waveScale={settings.waveScale}
         />
       </Animated.View>
 

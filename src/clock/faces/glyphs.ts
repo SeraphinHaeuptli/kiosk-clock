@@ -51,14 +51,14 @@ export function glyphColumns(text: string): number {
 /* -------------------------------------------------------------------------- */
 
 /** Fine cells per coarse cell. The glyph grid is the sketch, not the output. */
-const SUB_X = 4;
+const SUB_X = 6;
 /**
  * More rows than columns per cell. The source font is 5x7, which at full
  * screen width leaves a block about three and a half times wider than tall;
  * subdividing further vertically stretches the digits back to a proportion a
  * clock can carry, and puts more characters on screen while doing it.
  */
-const SUB_Y = 4;
+const SUB_Y = 5;
 
 /**
  * Light to dense, chosen per cell from how buried it is in the shape.

@@ -13,6 +13,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   apk:
     name: Build APK
@@ -58,3 +61,17 @@ jobs:
           name: kiosk-apk
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+
+      # A run artifact downloads as a .zip, which is awkward to open on a
+      # phone. On a tag, attach the APK to a release as well: that gives a
+      # plain URL the phone can install straight from.
+      - name: Attach the APK to a release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mv android/app/build/outputs/apk/release/app-release.apk kiosk-clock.apk
+          gh release create "$GITHUB_REF_NAME" kiosk-clock.apk \
+            --title "Kiosk $GITHUB_REF_NAME" \
+            --notes "Sideload build, signed with the debug keystore. Open the .apk on the phone and allow installs from unknown sources."
+

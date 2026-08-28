@@ -1,12 +1,22 @@
 import { TONES, type ToneId } from '@/design/palette';
 
 export type FaceId = 'ascii' | 'digital' | 'stack' | 'analog' | 'words';
-export type BackdropId = 'void' | 'horizon' | 'stars' | 'dither';
+export type BackdropId = 'void' | 'horizon' | 'stars' | 'dither' | 'wave';
+
+/** How fast the wave field drifts. 'still' stops the animation entirely. */
+export type WaveSpeed = 'still' | 'slow' | 'medium' | 'fast';
+/** Noise frequency: fine is busy and tight, coarse is broad and slow-rolling. */
+export type WaveScale = 'fine' | 'medium' | 'coarse';
+/** 'match' follows the clock's own tone; anything else overrides it. */
+export type BackdropTone = 'match' | ToneId;
 
 export interface ClockSettings {
   face: FaceId;
   tone: ToneId;
   backdrop: BackdropId;
+  backdropTone: BackdropTone;
+  waveSpeed: WaveSpeed;
+  waveScale: WaveScale;
 
   hour12: boolean;
   showSeconds: boolean;
@@ -28,7 +38,10 @@ export interface ClockSettings {
 export const DEFAULT_SETTINGS: ClockSettings = {
   face: 'ascii',
   tone: 'white',
-  backdrop: 'horizon',
+  backdrop: 'wave',
+  backdropTone: 'match',
+  waveSpeed: 'slow',
+  waveScale: 'medium',
 
   hour12: false,
   showSeconds: false,
@@ -44,7 +57,15 @@ export const DEFAULT_SETTINGS: ClockSettings = {
 };
 
 const FACES: readonly FaceId[] = ['ascii', 'digital', 'stack', 'analog', 'words'];
-const BACKDROPS: readonly BackdropId[] = ['void', 'horizon', 'stars', 'dither'];
+const BACKDROPS: readonly BackdropId[] = [
+  'void',
+  'horizon',
+  'stars',
+  'dither',
+  'wave',
+];
+const WAVE_SPEEDS: readonly WaveSpeed[] = ['still', 'slow', 'medium', 'fast'];
+const WAVE_SCALES: readonly WaveScale[] = ['fine', 'medium', 'coarse'];
 
 function oneOf<T extends string>(
   options: readonly T[],
@@ -76,6 +97,13 @@ export function decodeSettings(raw: unknown): ClockSettings {
       DEFAULT_SETTINGS.tone,
     ) as ToneId,
     backdrop: oneOf(BACKDROPS, input.backdrop, DEFAULT_SETTINGS.backdrop),
+    backdropTone: oneOf(
+      ['match', ...TONES.map((t) => t.id)] as const,
+      input.backdropTone,
+      DEFAULT_SETTINGS.backdropTone,
+    ) as BackdropTone,
+    waveSpeed: oneOf(WAVE_SPEEDS, input.waveSpeed, DEFAULT_SETTINGS.waveSpeed),
+    waveScale: oneOf(WAVE_SCALES, input.waveScale, DEFAULT_SETTINGS.waveScale),
 
     hour12: bool(input.hour12, DEFAULT_SETTINGS.hour12),
     showSeconds: bool(input.showSeconds, DEFAULT_SETTINGS.showSeconds),
