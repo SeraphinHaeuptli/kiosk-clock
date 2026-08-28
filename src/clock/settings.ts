@@ -21,7 +21,7 @@ export interface ClockSettings {
   hour12: boolean;
   showSeconds: boolean;
   showDate: boolean;
-  showUsage: boolean;
+  showMedia: boolean;
 
   /** Hold the screen on while the kiosk is in the foreground. */
   keepAwake: boolean;
@@ -31,8 +31,8 @@ export interface ClockSettings {
   burnInGuard: boolean;
   landscape: boolean;
 
-  /** Optional HTTP source for live Claude usage. Empty means sample data. */
-  usageEndpoint: string;
+  /** Optional HTTP source for now-playing metadata. Empty means no source. */
+  nowPlayingEndpoint: string;
 }
 
 export const DEFAULT_SETTINGS: ClockSettings = {
@@ -46,14 +46,14 @@ export const DEFAULT_SETTINGS: ClockSettings = {
   hour12: false,
   showSeconds: false,
   showDate: true,
-  showUsage: true,
+  showMedia: true,
 
   keepAwake: true,
   nightDim: true,
   burnInGuard: true,
   landscape: false,
 
-  usageEndpoint: '',
+  nowPlayingEndpoint: '',
 };
 
 const FACES: readonly FaceId[] = ['ascii', 'digital', 'stack', 'analog', 'words'];
@@ -108,17 +108,17 @@ export function decodeSettings(raw: unknown): ClockSettings {
     hour12: bool(input.hour12, DEFAULT_SETTINGS.hour12),
     showSeconds: bool(input.showSeconds, DEFAULT_SETTINGS.showSeconds),
     showDate: bool(input.showDate, DEFAULT_SETTINGS.showDate),
-    showUsage: bool(input.showUsage, DEFAULT_SETTINGS.showUsage),
+    showMedia: bool(input.showMedia, DEFAULT_SETTINGS.showMedia),
 
     keepAwake: bool(input.keepAwake, DEFAULT_SETTINGS.keepAwake),
     nightDim: bool(input.nightDim, DEFAULT_SETTINGS.nightDim),
     burnInGuard: bool(input.burnInGuard, DEFAULT_SETTINGS.burnInGuard),
     landscape: bool(input.landscape, DEFAULT_SETTINGS.landscape),
 
-    usageEndpoint:
-      typeof input.usageEndpoint === 'string'
-        ? input.usageEndpoint.trim()
-        : DEFAULT_SETTINGS.usageEndpoint,
+    nowPlayingEndpoint:
+      typeof input.nowPlayingEndpoint === 'string'
+        ? input.nowPlayingEndpoint.trim()
+        : DEFAULT_SETTINGS.nowPlayingEndpoint,
   };
 }
 

@@ -23,7 +23,10 @@ import {
   TextRow,
   type Choice,
 } from '@/ui/Terminal';
-import { resolveEndpoint, useUsage } from '@/usage/useUsage';
+import {
+  resolveNowPlayingEndpoint,
+  useNowPlaying,
+} from '@/media/useNowPlaying';
 
 const BACKDROPS: readonly Choice<BackdropId>[] = [
   { id: 'void', name: 'void' },
@@ -56,18 +59,18 @@ const TONE_CHOICES: readonly Choice<ToneId>[] = TONES.map((tone) => ({
   name: tone.name,
 }));
 
-const USAGE_HINT =
-  'any endpoint returning {"session":{"used":0.62,"resetsAt":"<iso>"}}. ' +
-  '"used" may be a 0-1 fraction, or a count alongside "limit". an optional ' +
-  '"week" object shows beside the session meter. empty = sample data.';
+const AUDIO_HINT =
+  'any endpoint returning {"title":"...","artist":"...","playing":true}. ' +
+  'a playerctl or mpris wrapper on the machine playing the audio is the ' +
+  'usual source. empty = no source.';
 
 function sourceStatus(
-  mode: 'sample' | 'live' | 'stale' | undefined,
+  mode: 'none' | 'live' | 'stale' | undefined,
   warning: string | undefined,
 ): string {
   if (mode === 'live') return 'live';
   if (mode === 'stale') return `unreachable - ${warning ?? 'unknown error'}`;
-  return 'sample data';
+  return 'no source';
 }
 
 export default function SettingsScreen() {
@@ -78,7 +81,10 @@ export default function SettingsScreen() {
 
   // Mirrors the kiosk's own source, so the status line reflects the real
   // result of whatever endpoint is currently typed in.
-  const usage = useUsage(resolveEndpoint(settings.usageEndpoint), true);
+  const nowPlaying = useNowPlaying(
+    resolveNowPlayingEndpoint(settings.nowPlayingEndpoint),
+    true,
+  );
 
   const confirmReset = () => {
     Alert.alert('reset all settings?', 'the clock returns to its defaults.', [
@@ -194,9 +200,10 @@ export default function SettingsScreen() {
           tone={tone}
         />
         <CheckRow
-          title="usage counter"
-          checked={settings.showUsage}
-          onChange={(showUsage) => update({ showUsage })}
+          title="audio bar"
+          hint="now playing, and a swipeable volume control"
+          checked={settings.showMedia}
+          onChange={(showMedia) => update({ showMedia })}
           tone={tone}
         />
 
@@ -229,18 +236,18 @@ export default function SettingsScreen() {
           tone={tone}
         />
 
-        <Heading>usage</Heading>
+        <Heading>now playing</Heading>
         <TextRow
           title="endpoint"
-          value={settings.usageEndpoint}
+          value={settings.nowPlayingEndpoint}
           placeholder="https://..."
-          onChangeText={(usageEndpoint) => update({ usageEndpoint })}
+          onChangeText={(nowPlayingEndpoint) => update({ nowPlayingEndpoint })}
         />
         <StatusRow
           title="source"
-          value={sourceStatus(usage.result?.mode, usage.result?.warning)}
+          value={sourceStatus(nowPlaying.result?.mode, nowPlaying.result?.warning)}
         />
-        <Text style={styles.note}>{USAGE_HINT}</Text>
+        <Text style={styles.note}>{AUDIO_HINT}</Text>
 
         <Heading>reset</Heading>
         <ActionRow title="reset all settings" onPress={confirmReset} />

@@ -1,0 +1,55 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
+
+import { useDebounced } from '@/core/useDebounced';
+
+import { loadNowPlaying, type NowPlayingResult } from './nowPlaying';
+
+/** Tracks change often, so poll on the order of seconds. */
+const REFRESH_MS = 10_000;
+const ENDPOINT_SETTLE_MS = 500;
+
+const ENV_ENDPOINT = (
+  process.env.EXPO_PUBLIC_NOW_PLAYING_ENDPOINT ?? ''
+).trim();
+
+/** Settings win over the build-time default, which wins over no source. */
+export function resolveNowPlayingEndpoint(configured: string): string {
+  return configured.trim() || ENV_ENDPOINT;
+}
+
+export function useNowPlaying(endpoint: string, enabled: boolean) {
+  const [result, setResult] = useState<NowPlayingResult | null>(null);
+  const generation = useRef(0);
+  const settled = useDebounced(endpoint, ENDPOINT_SETTLE_MS);
+
+  const refresh = useCallback(() => {
+    if (!enabled) return;
+    const token = ++generation.current;
+
+    loadNowPlaying(settled).then((next) => {
+      if (token === generation.current) setResult(next);
+    });
+  }, [settled, enabled]);
+
+  useEffect(() => {
+    if (!enabled) {
+      setResult(null);
+      return;
+    }
+
+    refresh();
+    const timer = setInterval(refresh, REFRESH_MS);
+    const subscription = AppState.addEventListener('change', (status) => {
+      if (status === 'active') refresh();
+    });
+
+    return () => {
+      generation.current += 1;
+      clearInterval(timer);
+      subscription.remove();
+    };
+  }, [refresh, enabled]);
+
+  return { result, refresh };
+}

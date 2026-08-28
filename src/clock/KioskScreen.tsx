@@ -23,8 +23,12 @@ import { useNow } from '@/core/useNow';
 import { label, surface, toneOf } from '@/design/palette';
 import { duration, hairline, space, type } from '@/design/tokens';
 import { MenuGlyph } from '@/ui/Terminal';
-import { UsageBar } from '@/usage/UsageBar';
-import { resolveEndpoint, useUsage } from '@/usage/useUsage';
+import { MediaBar } from '@/media/MediaBar';
+import {
+  resolveNowPlayingEndpoint,
+  useNowPlaying,
+} from '@/media/useNowPlaying';
+import { useVolume } from '@/media/useVolume';
 
 import { Backdrop } from './Backdrop';
 import { BurnInGuard } from './BurnInGuard';
@@ -36,9 +40,10 @@ const KEEP_AWAKE_TAG = 'kiosk-clock';
 const CHROME_TIMEOUT_MS = 4_000;
 const NIGHT_OPACITY = 0.45;
 /**
- * The face scales with the display, but the usage meter is a fixed-density
- * readout: stretched across a landscape phone or a desktop it strands its
- * label at one edge and its value at the other.
+ * The face scales with the display, but the audio bar is a fixed-density
+ * readout: stretched across a landscape phone or a desktop it strands the
+ * track name at one edge and the level at the other, and turns a small swipe
+ * into a huge volume jump.
  */
 const METER_MAX_WIDTH = 560;
 /**
@@ -59,10 +64,11 @@ export function KioskScreen() {
     settings.showSeconds || settings.face === 'analog' ? 'second' : 'minute',
   );
 
-  const usage = useUsage(
-    resolveEndpoint(settings.usageEndpoint),
-    settings.showUsage,
+  const nowPlaying = useNowPlaying(
+    resolveNowPlayingEndpoint(settings.nowPlayingEndpoint),
+    settings.showMedia,
   );
+  const volume = useVolume(settings.showMedia);
 
   /* -- Kiosk behaviours ---------------------------------------------------- */
 
@@ -240,12 +246,18 @@ export function KioskScreen() {
           </BurnInGuard>
         </Animated.View>
 
-        {settings.showUsage && (
-          <Animated.View
-            pointerEvents="none"
-            style={[styles.meter, { opacity: dim }]}
-          >
-            <UsageBar result={usage.result} tone={tone} />
+        {settings.showMedia && (
+          // Interactive, unlike the rest of the face: the bar has to receive
+          // the swipe rather than let it fall through to the reveal tap.
+          <Animated.View style={[styles.meter, { opacity: dim }]}>
+            <MediaBar
+              tone={tone}
+              volume={volume.level}
+              controllable={volume.controllable}
+              onChange={volume.set}
+              onDragChange={volume.setDragging}
+              nowPlaying={nowPlaying.result}
+            />
           </Animated.View>
         )}
       </View>

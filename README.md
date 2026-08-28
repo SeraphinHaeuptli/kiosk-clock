@@ -1,8 +1,8 @@
 # Kiosk
 
 A monochrome, customisable clock for Android and iOS, built to be left
-running — a full-bleed kiosk face with a Claude session usage meter along the
-bottom, drawn in the idiom of a phosphor terminal.
+running — a full-bleed kiosk face with a now-playing line and a swipeable
+volume control along the bottom, drawn in the idiom of a phosphor terminal.
 
 Expo SDK 57 · React Native 0.86 · TypeScript (strict) · Expo Router.
 
@@ -134,35 +134,39 @@ landscape lock for a dock or stand, and both system bars — status and
 navigation — hidden while the clock is up, re-asserted on every rotation.
 Tap anywhere for the settings button; it fades out again after four seconds.
 
-**Usage meter.** The rolling five-hour Claude session allowance as a character
-bar sized to the space available, with a countdown to reset and the weekly
-allowance alongside. Past 90% the percentage flips to inverse video.
+**Audio bar.** What is playing, over a volume control you drag sideways. The
+gesture is relative rather than absolute: a swipe moves the level by how far
+the finger travelled, so a stray tap on the bar cannot slam the volume to
+wherever it landed — the wrong behaviour for a device sitting on a desk. One
+haptic tick per cell crossed, the way a physical volume wheel detents.
 
-## Connecting live usage
+## Connecting now playing
 
-The meter shows sample data until you point it at an endpoint, either in
-Settings → Claude Usage → Endpoint or via `EXPO_PUBLIC_CLAUDE_USAGE_ENDPOINT`
-(see `.env.example`). Anything that serves this shape works:
+The bar reads "nothing playing" until you point it at an endpoint, either in
+Settings → now playing → endpoint or via `EXPO_PUBLIC_NOW_PLAYING_ENDPOINT`
+(see `.env.example`). Anything serving this shape works:
 
 ```json
-{
-  "session": { "used": 0.62, "resetsAt": "2026-08-26T22:00:00Z" },
-  "week":    { "used": 41, "limit": 100, "resetsInSeconds": 259200 }
-}
+{ "title": "Song name", "artist": "Artist", "playing": true }
 ```
 
-`used` is either a 0–1 fraction or a count paired with `limit`. Reset time
-accepts an ISO timestamp, an epoch in seconds or milliseconds, or
-`resetsInSeconds`. `week` is optional.
+`artist` is optional; `playing` is also accepted as `isPlaying`, or inferred
+from a `status` field. The usual source is a small wrapper around `playerctl`
+or MPRIS on whichever machine is actually playing the audio.
+
+Reading another app's media session **on the device itself** is not wired up.
+Android needs a `NotificationListenerService` and a permission the user grants
+in system settings; iOS does not expose other apps' now-playing at all. The
+endpoint is the portable answer.
 
 Provenance is always visible, because a broken source that silently shows
-plausible numbers is worse than no source:
+nothing is indistinguishable from silence:
 
 | Mode | Meaning | Shown as |
 |---|---|---|
-| `live` | the endpoint answered | no pill |
-| `sample` | no endpoint configured; demo data by design | grey "sample" |
-| `stale` | an endpoint is configured but the call failed | amber "stale" |
+| live | the endpoint answered | no tag |
+| none | no endpoint configured | `[no source]` |
+| stale | an endpoint is configured but the call failed | `[stale]` |
 
 ## Platform notes
 
@@ -202,6 +206,12 @@ Android, so the behaviour is the same on both.
 On Android the kiosk screen hides the system navigation bar while it is
 focused, and restores it when settings opens so the app stays navigable.
 
+Device volume needs a native module, so it does **not** work in Expo Go — the
+bar still moves and reads the level, but nothing is driven, and it says
+"volume unavailable" rather than pretending. Build the APK for real control.
+Every call into the module is guarded, so its absence degrades the control
+instead of crashing the clock behind it.
+
 ## Layout
 
 ```
@@ -221,12 +231,13 @@ src/
                         and the registry
     Backdrop.tsx        The four backdrops
     KioskScreen.tsx     Composition
-  usage/
-    usage.ts            Domain: windows, thresholds
-    sources.ts          Sample + HTTP sources, and the fallback that
-                        distinguishes live / sample / stale
-    useUsage.ts         Refresh on mount, each minute, and on foreground
-    UsageBar.tsx        The meter
+  media/
+    volume.ts           Domain: level, clamping, formatting
+    systemVolume.ts     Guarded adapter over the native volume module
+    useVolume.ts        Optimistic level, reconciled by the OS listener
+    nowPlaying.ts       Domain + HTTP source with live / none / stale
+    useNowPlaying.ts    Refresh on mount, on an interval, and on foreground
+    MediaBar.tsx        Now playing + the swipeable volume bar
   ui/Terminal.tsx       Headings, checks, choices, fields
 ```
 
