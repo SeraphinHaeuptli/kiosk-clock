@@ -21,28 +21,50 @@ interface Props {
 
 /* -------------------------------------------------------------------------- */
 
-/** A wash that brightens with the sun and drains to black overnight. */
+/**
+ * Time reactivity, with a floor.
+ *
+ * The backdrops drove straight off `light`, which gave each one an hour where
+ * it drew nothing at all: the star field was empty at midday, the horizon wash
+ * reached two parts in 255 at midnight. Picking a backdrop and getting a black
+ * screen reads as a broken app rather than a subtle one, so the day still
+ * moves them — between `floor` and full, instead of between nothing and full.
+ */
+function withFloor(value: number, floor: number): number {
+  return floor + (1 - floor) * value;
+}
+
+/** How much of the wash survives midnight. */
+const HORIZON_FLOOR = 0.35;
+
+/** A wash that brightens with the sun without draining to black overnight. */
 function Horizon({ tone, light }: { tone: Tone; light: number }) {
-  const peak = 0.02 + light * 0.1;
+  // A gradient has no local contrast to help it, so it needs more ink than a
+  // character field does to read as anything at all.
+  const peak = 0.15 + withFloor(light, HORIZON_FLOOR) * 0.17;
 
   return (
     <LinearGradient
       colors={[
         withAlpha(tone.color, peak),
-        withAlpha(tone.color, peak * 0.45),
+        withAlpha(tone.color, peak * 0.5),
         'rgba(0,0,0,0)',
       ]}
-      locations={[0, 0.6, 1]}
+      // Reaches transparent just short of the bottom rather than exactly at it,
+      // so the wash is a band with an end and not an even veil over everything.
+      locations={[0, 0.5, 0.95]}
       style={StyleSheet.absoluteFill}
       pointerEvents="none"
     />
   );
 }
 
-const STAR_COUNT = 130;
+const STAR_COUNT = 200;
 const STAR_CHARS = ['·', '·', '·', '*', '+', '˙'];
+/** How much of the field survives midday. */
+const STAR_FLOOR = 0.3;
 
-/** A field that comes out after dark and is gone by noon. */
+/** A field that comes out after dark and thins, without emptying, by noon. */
 function Stars({ tone, light }: { tone: Tone; light: number }) {
   const { width, height } = useWindowDimensions();
 
@@ -60,8 +82,9 @@ function Stars({ tone, light }: { tone: Tone; light: number }) {
     [width, height],
   );
 
-  const darkness = 1 - light;
-  if (darkness <= 0.02) return null;
+  // Floored rather than `1 - light`, which put the field at exactly zero every
+  // midday. Full darkness still gives full brightness, so nights are unchanged.
+  const darkness = withFloor(1 - light, STAR_FLOOR);
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -89,9 +112,9 @@ function Stars({ tone, light }: { tone: Tone; light: number }) {
 const DITHER_FONT = 13;
 const DITHER_LINE = 17;
 /** Keeps a sparse dusting visible at midnight rather than an empty screen. */
-const DITHER_FLOOR = 0.06;
+const DITHER_FLOOR = 0.2;
 /** How much of the field the sun can fill. Below 1, so noon still breathes. */
-const DITHER_GAIN = 0.5;
+const DITHER_GAIN = 0.4;
 
 /**
  * Deliberately tops out at '*'. With '#' in the ramp the midday field turned
@@ -134,7 +157,9 @@ function Dither({ tone, light }: { tone: Tone; light: number }) {
             fontSize: DITHER_FONT,
             lineHeight: DITHER_LINE,
             color: tone.color,
-            opacity: 0.09,
+            // Under a tenth the field was drawn at 21/255 at its brightest,
+            // which is below what a phone screen shows in a lit room.
+            opacity: 0.24,
           }}
         >
           {cells
