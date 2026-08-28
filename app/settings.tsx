@@ -23,6 +23,7 @@ import {
   TextRow,
   type Choice,
 } from '@/ui/Terminal';
+import { openNotificationAccessSettings } from '@/media/nowPlayingSource';
 import {
   resolveNowPlayingEndpoint,
   useNowPlaying,
@@ -60,15 +61,17 @@ const TONE_CHOICES: readonly Choice<ToneId>[] = TONES.map((tone) => ({
 }));
 
 const AUDIO_HINT =
-  'any endpoint returning {"title":"...","artist":"...","playing":true}. ' +
-  'a playerctl or mpris wrapper on the machine playing the audio is the ' +
-  'usual source. empty = no source.';
+  'android reads the device media session directly once notification access ' +
+  'is granted. the endpoint is the fallback, and the only option on ios: any ' +
+  'url returning {"title":"...","artist":"...","playing":true}, such as a ' +
+  'playerctl or mpris wrapper on the machine doing the playing.';
 
 function sourceStatus(
   mode: 'none' | 'live' | 'stale' | undefined,
+  from: 'device' | 'endpoint' | 'none' | undefined,
   warning: string | undefined,
 ): string {
-  if (mode === 'live') return 'live';
+  if (mode === 'live') return `live via ${from}`;
   if (mode === 'stale') return `unreachable - ${warning ?? 'unknown error'}`;
   return 'no source';
 }
@@ -245,9 +248,19 @@ export default function SettingsScreen() {
         />
         <StatusRow
           title="source"
-          value={sourceStatus(nowPlaying.result?.mode, nowPlaying.result?.warning)}
+          value={sourceStatus(
+            nowPlaying.result?.mode,
+            nowPlaying.result?.from,
+            nowPlaying.result?.warning,
+          )}
         />
         <StatusRow title="on this device" value={nowPlaying.source.reason} />
+        {nowPlaying.source.needsPermission && (
+          <ActionRow
+            title="grant notification access"
+            onPress={openNotificationAccessSettings}
+          />
+        )}
         <Text style={styles.note}>{AUDIO_HINT}</Text>
 
         <Heading>reset</Heading>

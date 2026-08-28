@@ -43,5 +43,10 @@
     "web": "expo start --web",
     "check:native": "node scripts/check-native-versions.mjs"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "autolinking": {
+      "nativeModulesDir": "./modules"
+    }
+  }
 }

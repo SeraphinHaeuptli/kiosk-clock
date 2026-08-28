@@ -154,19 +154,26 @@ Settings → now playing → endpoint or via `EXPO_PUBLIC_NOW_PLAYING_ENDPOINT`
 from a `status` field. The usual source is a small wrapper around `playerctl`
 or MPRIS on whichever machine is actually playing the audio.
 
-### Why there is no on-device source
+### Where the track comes from
 
-The app resolves the best available source per platform on launch and reports
-which one it picked, in Settings → now playing → on this device. The honest
-answer differs sharply, and only one platform can do it at all:
+The app resolves the best source for the device on launch and reports which it
+picked, in Settings → now playing → on this device.
 
-**Android can.** `MediaSessionManager.getActiveSessions` reports every active
-media session, but it is gated behind `BIND_NOTIFICATION_LISTENER_SERVICE` —
-the Notification Access grant that scrobblers and lock-screen replacements ask
-for, which the user must enable in system settings. It needs a native service
-declared in the manifest, so it is not something a JavaScript-only build can
-switch on. The packages that wrap it are all several years stale and predate
-the current React Native architecture, so none is wired in here.
+**Android reads it directly.** This is what scrobblers and lock-screen
+replacements do: declare a `NotificationListenerService`, have the user grant
+Notification Access, then call `MediaSessionManager.getActiveSessions` with
+that service's `ComponentName` and read the structured `MediaMetadata` off each
+`MediaController`. Parsing the media notification's text is the alternative and
+is strictly worse — the metadata is already typed, so there is nothing to
+scrape. The other route, `MEDIA_CONTENT_CONTROL`, is privileged-only and not
+available to normal apps.
+
+The service in `modules/now-playing` deliberately does nothing: no callbacks
+are overridden and no notification content is ever inspected. It exists purely
+to be enabled, because being an enabled listener is what makes
+`getActiveSessions` callable. Settings offers a button that opens the system
+screen where the grant is toggled; there is no callback for it, so the app
+re-checks rather than waiting to be told.
 
 **iOS cannot, at all.** `MPNowPlayingInfoCenter` is write-only — it publishes
 what *your* app plays. `MPMusicPlayerController` reads only the built-in Music
@@ -175,8 +182,10 @@ private MediaRemote framework, which is not permitted on the App Store.
 
 **Browsers cannot** read system media sessions either.
 
-So the endpoint is the portable answer on every platform, and pointing it at
-the machine actually playing the audio is the intended arrangement.
+So the endpoint remains the fallback everywhere, and the only option on iOS. It
+is still consulted on Android when the device reports nothing playing, because
+the common arrangement is a phone on a desk beside the computer doing the
+playing.
 
 Provenance is always visible, because a broken source that silently shows
 nothing is indistinguishable from silence:
@@ -255,6 +264,7 @@ src/
     Backdrop.tsx        The four backdrops
     KioskScreen.tsx     Composition
   media/
+    nowPlayingSource.ts Resolves device vs endpoint per platform
     volume.ts           Domain: level, clamping, formatting
     systemVolume.ts     Guarded adapter over the native volume module
     useVolume.ts        Optimistic level, reconciled by the OS listener
@@ -262,6 +272,9 @@ src/
     useNowPlaying.ts    Refresh on mount, on an interval, and on foreground
     MediaBar.tsx        Now playing + the swipeable volume bar
   ui/Terminal.tsx       Headings, checks, choices, fields
+
+modules/now-playing/    Local Android module: a NotificationListenerService
+                        that holds the grant, and MediaSessionManager reads
 ```
 
 Dependencies point inward: `ui` and screens depend on `core` and `design`,

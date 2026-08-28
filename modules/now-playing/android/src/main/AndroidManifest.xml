@@ -1,0 +1,20 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <!--
+      Declared solely so the app can be granted Notification Access. The
+      service itself does nothing: holding the grant is what makes
+      MediaSessionManager.getActiveSessions callable, which is where the
+      structured metadata actually comes from. The alternative permission,
+      MEDIA_CONTENT_CONTROL, is privileged-only and unavailable to normal apps.
+    -->
+    <service
+      android:name="expo.modules.nowplaying.KioskNotificationListener"
+      android:label="Kiosk now playing"
+      android:exported="true"
+      android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+      <intent-filter>
+        <action android:name="android.service.notification.NotificationListenerService" />
+      </intent-filter>
+    </service>
+  </application>
+</manifest>

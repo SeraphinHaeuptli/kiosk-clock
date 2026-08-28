@@ -6,6 +6,8 @@
  * configured, 'stale' means something is and it broke.
  */
 
+import { readDeviceNowPlaying } from '../../modules/now-playing';
+
 const REQUEST_TIMEOUT_MS = 6_000;
 
 export interface Track {
@@ -16,9 +18,13 @@ export interface Track {
 
 export type NowPlayingMode = 'none' | 'live' | 'stale';
 
+export type NowPlayingFrom = 'device' | 'endpoint' | 'none';
+
 export interface NowPlayingResult {
   track: Track | null;
   mode: NowPlayingMode;
+  /** Which source actually answered. */
+  from: NowPlayingFrom;
   /** Why a live fetch failed. Present only when mode is 'stale'. */
   warning?: string;
 }
@@ -65,28 +71,55 @@ function describe(error: unknown): string {
   return 'unknown error';
 }
 
+/**
+ * Device first, endpoint second.
+ *
+ * The endpoint is still tried when the device has nothing playing, because the
+ * common arrangement is a phone on a desk beside a computer that is doing the
+ * playing — the device source answering "nothing" should not hide it.
+ */
 export async function loadNowPlaying(
   endpoint: string,
+  useDevice: boolean,
 ): Promise<NowPlayingResult> {
-  if (!endpoint) return { track: null, mode: 'none' };
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(endpoint, {
-      headers: { Accept: 'application/json' },
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-    // A source with nothing playing is a valid answer, not a failure.
-    return { track: decodeTrack(await response.json()), mode: 'live' };
-  } catch (error) {
-    return { track: null, mode: 'stale', warning: describe(error) };
-  } finally {
-    clearTimeout(timeout);
+  if (useDevice) {
+    const track = readDeviceNowPlaying();
+    if (track) return { track, mode: 'live', from: 'device' };
   }
+
+  if (endpoint) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(endpoint, {
+        headers: { Accept: 'application/json' },
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      // A source with nothing playing is a valid answer, not a failure.
+      return {
+        track: decodeTrack(await response.json()),
+        mode: 'live',
+        from: 'endpoint',
+      };
+    } catch (error) {
+      return {
+        track: null,
+        mode: 'stale',
+        from: 'endpoint',
+        warning: describe(error),
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  // The device answered, and the answer was silence.
+  if (useDevice) return { track: null, mode: 'live', from: 'device' };
+
+  return { track: null, mode: 'none', from: 'none' };
 }
 
 /** One line for the display: "Title — Artist", or just the title. */
