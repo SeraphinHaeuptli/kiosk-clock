@@ -1,27 +1,25 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { numerals, tracking } from '@/design/tokens';
-import { label } from '@/design/palette';
-
 import { timeParts } from '@/core/format';
-import { NUMERAL_WEIGHT } from '../settings';
+import { label } from '@/design/palette';
+import { mono, numerals, tracking } from '@/design/tokens';
+
 import type { FaceProps } from './types';
 
-const SCALE = 2.3;
+const SCALE = 1.9;
 
 /** Hours over minutes at maximum size — readable across a room. */
-export function StackFace({ now, settings, accent, size }: FaceProps) {
+export function StackFace({ now, settings, tone, size }: FaceProps) {
   const { hours, minutes, suffix } = timeParts(now, settings.hour12);
   const font = size * SCALE;
-  const weight = NUMERAL_WEIGHT[settings.weight];
 
   const digit = {
     ...numerals,
+    fontFamily: mono,
     fontSize: font,
     // Leading below 1.0 tightens the two rows into a single visual block.
-    lineHeight: font * 0.92,
+    lineHeight: font * 0.95,
     letterSpacing: tracking(font),
-    fontWeight: weight,
     textAlign: 'center',
   } as const;
 
@@ -30,18 +28,18 @@ export function StackFace({ now, settings, accent, size }: FaceProps) {
       <Text style={[digit, { color: label.primary }]} allowFontScaling={false}>
         {hours}
       </Text>
-      <Text style={[digit, { color: accent.color }]} allowFontScaling={false}>
+      <Text style={[digit, { color: tone.color }]} allowFontScaling={false}>
         {minutes}
       </Text>
 
       {suffix && (
         <Text
           style={{
+            fontFamily: mono,
             fontSize: font * 0.14,
-            fontWeight: '600',
             color: label.tertiary,
-            letterSpacing: 2,
-            marginTop: font * 0.06,
+            letterSpacing: 3,
+            marginTop: font * 0.08,
           }}
           allowFontScaling={false}
         >

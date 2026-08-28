@@ -1,4 +1,5 @@
 import { clamp01 } from '@/core/format';
+import { noise } from '@/core/random';
 
 import {
   SESSION_WINDOW_MS,
@@ -14,15 +15,6 @@ const REQUEST_TIMEOUT_MS = 8_000;
 /* -------------------------------------------------------------------------- */
 /* Sample source                                                              */
 /* -------------------------------------------------------------------------- */
-
-/** Deterministic 0–1 noise, so a given window always gets the same shape. */
-function seed(value: number): number {
-  let x = Math.imul(value ^ 0x9e3779b9, 0x85ebca6b);
-  x ^= x >>> 13;
-  x = Math.imul(x, 0xc2b2ae35);
-  x ^= x >>> 16;
-  return (x >>> 0) / 0xffffffff;
-}
 
 function startOfWeek(now: number): number {
   const date = new Date(now);
@@ -44,7 +36,7 @@ function syntheticWindow(
   const [low, high] = intensityRange;
   // Consumption tracks elapsed time, scaled by a per-window "how hard was this
   // window worked" factor, so the meter fills plausibly and resets on schedule.
-  const intensity = low + seed(anchor) * (high - low);
+  const intensity = low + noise(anchor) * (high - low);
 
   return { id, name, used: clamp01(elapsed * intensity), resetsAt: anchor + span };
 }

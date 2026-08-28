@@ -16,11 +16,12 @@ import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { daylight } from '@/core/daylight';
 import { longDate } from '@/core/format';
 import { useNow } from '@/core/useNow';
 import { label, surface } from '@/design/palette';
-import { duration, hairline, radius, space, type } from '@/design/tokens';
-import { SlidersGlyph } from '@/ui/SlidersGlyph';
+import { duration, hairline, space, type } from '@/design/tokens';
+import { MenuGlyph } from '@/ui/Terminal';
 import { UsageBar } from '@/usage/UsageBar';
 import { resolveEndpoint, useUsage } from '@/usage/useUsage';
 
@@ -39,9 +40,14 @@ const NIGHT_OPACITY = 0.45;
  * label at one edge and its value at the other.
  */
 const METER_MAX_WIDTH = 560;
+/**
+ * Quantising daylight lets the backdrop memo hold: it redraws a few times an
+ * hour instead of once a second alongside the clock.
+ */
+const LIGHT_STEPS = 48;
 
 export function KioskScreen() {
-  const { settings, accent, ready } = useSettings();
+  const { settings, tone, ready } = useSettings();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -149,7 +155,11 @@ export function KioskScreen() {
       <StatusBar hidden style="light" />
 
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: dim }]}>
-        <Backdrop backdrop={settings.backdrop} accent={accent} />
+        <Backdrop
+          backdrop={settings.backdrop}
+          tone={tone}
+          light={Math.round(daylight(now) * LIGHT_STEPS) / LIGHT_STEPS}
+        />
       </Animated.View>
 
       {/* Sits below the chrome so a tap anywhere else reveals it. */}
@@ -185,7 +195,7 @@ export function KioskScreen() {
             accessibilityRole="button"
             accessibilityLabel="Clock settings"
           >
-            <SlidersGlyph size={20} color={label.primary} />
+            <MenuGlyph size={16} color={label.primary} />
           </Pressable>
         </Animated.View>
 
@@ -197,7 +207,7 @@ export function KioskScreen() {
             <ClockFace
               now={now}
               settings={settings}
-              accent={accent}
+              tone={tone}
               size={faceSize}
             />
             {settings.showDate && (
@@ -213,7 +223,7 @@ export function KioskScreen() {
             pointerEvents="none"
             style={[styles.meter, { opacity: dim }]}
           >
-            <UsageBar result={usage.result} accentColor={accent.color} />
+            <UsageBar result={usage.result} tone={tone} />
           </Animated.View>
         )}
       </View>
@@ -226,22 +236,22 @@ const styles = StyleSheet.create({
   content: { flex: 1, flexDirection: 'column' },
   header: { flexDirection: 'row', justifyContent: 'flex-end' },
   controlButton: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.pill,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: surface.glass,
     borderWidth: hairline,
-    borderColor: surface.glassBorder,
+    borderColor: surface.line,
   },
   controlButtonPressed: { opacity: 0.55 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   meter: { width: '100%', maxWidth: METER_MAX_WIDTH, alignSelf: 'center' },
   faceBlock: { alignItems: 'center' },
   date: {
-    ...type.callout,
+    ...type.small,
     color: label.secondary,
-    marginTop: space.lg,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    marginTop: space.xl,
   },
 });

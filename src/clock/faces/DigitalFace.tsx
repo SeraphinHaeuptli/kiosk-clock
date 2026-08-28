@@ -1,24 +1,22 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { numerals, space, tracking } from '@/design/tokens';
-import { label } from '@/design/palette';
-
 import { timeParts } from '@/core/format';
-import { NUMERAL_WEIGHT } from '../settings';
+import { label } from '@/design/palette';
+import { mono, numerals, space, tracking } from '@/design/tokens';
+
 import type { FaceProps } from './types';
 
-/** Single-line time, the way StandBy shows it: HH:MM with the tint on the digits. */
-export function DigitalFace({ now, settings, accent, size }: FaceProps) {
+/** Single-line time: HH:MM, with the tone carried by the digits. */
+export function DigitalFace({ now, settings, tone, size }: FaceProps) {
   const { hours, minutes, seconds, suffix } = timeParts(now, settings.hour12);
-  const weight = NUMERAL_WEIGHT[settings.weight];
 
   const digit = {
     ...numerals,
+    fontFamily: mono,
     fontSize: size,
-    lineHeight: size * 1.08,
+    lineHeight: size * 1.1,
     letterSpacing: tracking(size),
-    fontWeight: weight,
-    color: accent.color,
+    color: tone.color,
   } as const;
 
   return (
@@ -26,10 +24,7 @@ export function DigitalFace({ now, settings, accent, size }: FaceProps) {
       <Text style={digit} allowFontScaling={false}>
         {hours}
       </Text>
-      <Text
-        style={[digit, styles.colon]}
-        allowFontScaling={false}
-      >
+      <Text style={[digit, { color: tone.dim }]} allowFontScaling={false}>
         :
       </Text>
       <Text style={digit} allowFontScaling={false}>
@@ -40,10 +35,10 @@ export function DigitalFace({ now, settings, accent, size }: FaceProps) {
         <Text
           style={{
             ...numerals,
+            fontFamily: mono,
             fontSize: size * 0.3,
-            fontWeight: weight,
             color: label.secondary,
-            marginLeft: size * 0.08,
+            marginLeft: size * 0.1,
           }}
           allowFontScaling={false}
         >
@@ -54,11 +49,11 @@ export function DigitalFace({ now, settings, accent, size }: FaceProps) {
       {suffix && (
         <Text
           style={{
-            fontSize: size * 0.22,
-            fontWeight: '600',
+            fontFamily: mono,
+            fontSize: size * 0.2,
             color: label.tertiary,
-            marginLeft: size * 0.08,
-            letterSpacing: 0.5,
+            marginLeft: size * 0.1,
+            letterSpacing: 1,
           }}
           allowFontScaling={false}
         >
@@ -70,12 +65,10 @@ export function DigitalFace({ now, settings, accent, size }: FaceProps) {
 }
 
 const styles = StyleSheet.create({
-  // Same tint as the digits, stepped back so the pairs stay the focus.
-  colon: { opacity: 0.5 },
   row: {
     flexDirection: 'row',
-    // Baseline keeps the seconds and AM/PM sitting on the numerals' feet
-    // rather than floating at their vertical centre.
+    // Baseline keeps the seconds and AM/PM on the numerals' feet rather than
+    // floating at their vertical centre.
     alignItems: 'baseline',
     paddingHorizontal: space.xs,
   },

@@ -81,7 +81,7 @@ function Ticks({ dial }: { dial: number }) {
   );
 }
 
-export function AnalogFace({ now, settings, accent, size }: FaceProps) {
+export function AnalogFace({ now, settings, tone, size }: FaceProps) {
   const dial = size * DIAL_SCALE;
 
   const hours = now.getHours() % 12;
@@ -126,7 +126,7 @@ export function AnalogFace({ now, settings, accent, size }: FaceProps) {
           angle={secondAngle}
           length={dial * 0.42}
           width={Math.max(1.5, dial * 0.008)}
-          color={accent.color}
+          color={tone.color}
           tail={dial * 0.09}
         />
       )}
@@ -136,7 +136,7 @@ export function AnalogFace({ now, settings, accent, size }: FaceProps) {
           width: cap,
           height: cap,
           borderRadius: cap / 2,
-          backgroundColor: accent.color,
+          backgroundColor: tone.color,
         }}
       />
     </View>

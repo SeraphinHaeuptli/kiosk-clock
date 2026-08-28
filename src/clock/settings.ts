@@ -1,14 +1,12 @@
-import { ACCENTS, type AccentId } from '@/design/palette';
+import { TONES, type ToneId } from '@/design/palette';
 
-export type FaceId = 'digital' | 'stack' | 'analog' | 'words';
-export type BackdropId = 'black' | 'gradient' | 'aurora';
-export type NumeralWeight = 'light' | 'regular' | 'bold';
+export type FaceId = 'ascii' | 'digital' | 'stack' | 'analog' | 'words';
+export type BackdropId = 'void' | 'horizon' | 'stars' | 'dither';
 
 export interface ClockSettings {
   face: FaceId;
-  accent: AccentId;
+  tone: ToneId;
   backdrop: BackdropId;
-  weight: NumeralWeight;
 
   hour12: boolean;
   showSeconds: boolean;
@@ -28,10 +26,9 @@ export interface ClockSettings {
 }
 
 export const DEFAULT_SETTINGS: ClockSettings = {
-  face: 'digital',
-  accent: 'blue',
-  backdrop: 'aurora',
-  weight: 'light',
+  face: 'ascii',
+  tone: 'white',
+  backdrop: 'horizon',
 
   hour12: false,
   showSeconds: false,
@@ -46,9 +43,8 @@ export const DEFAULT_SETTINGS: ClockSettings = {
   usageEndpoint: '',
 };
 
-const FACES: readonly FaceId[] = ['digital', 'stack', 'analog', 'words'];
-const BACKDROPS: readonly BackdropId[] = ['black', 'gradient', 'aurora'];
-const WEIGHTS: readonly NumeralWeight[] = ['light', 'regular', 'bold'];
+const FACES: readonly FaceId[] = ['ascii', 'digital', 'stack', 'analog', 'words'];
+const BACKDROPS: readonly BackdropId[] = ['void', 'horizon', 'stars', 'dither'];
 
 function oneOf<T extends string>(
   options: readonly T[],
@@ -65,7 +61,8 @@ function bool(value: unknown, fallback: boolean): boolean {
 /**
  * Build valid settings from anything that came out of storage. Unknown or
  * missing fields fall back to their default, so settings written by an older
- * build stay loadable after the schema changes.
+ * build stay loadable — including ones naming faces, backdrops or accent
+ * colours that no longer exist.
  */
 export function decodeSettings(raw: unknown): ClockSettings {
   if (typeof raw !== 'object' || raw === null) return DEFAULT_SETTINGS;
@@ -73,13 +70,12 @@ export function decodeSettings(raw: unknown): ClockSettings {
 
   return {
     face: oneOf(FACES, input.face, DEFAULT_SETTINGS.face),
-    accent: oneOf(
-      ACCENTS.map((a) => a.id),
-      input.accent,
-      DEFAULT_SETTINGS.accent,
-    ) as AccentId,
+    tone: oneOf(
+      TONES.map((t) => t.id),
+      input.tone,
+      DEFAULT_SETTINGS.tone,
+    ) as ToneId,
     backdrop: oneOf(BACKDROPS, input.backdrop, DEFAULT_SETTINGS.backdrop),
-    weight: oneOf(WEIGHTS, input.weight, DEFAULT_SETTINGS.weight),
 
     hour12: bool(input.hour12, DEFAULT_SETTINGS.hour12),
     showSeconds: bool(input.showSeconds, DEFAULT_SETTINGS.showSeconds),
@@ -97,13 +93,6 @@ export function decodeSettings(raw: unknown): ClockSettings {
         : DEFAULT_SETTINGS.usageEndpoint,
   };
 }
-
-/** Font weights for the numerals, per the three-step weight control. */
-export const NUMERAL_WEIGHT: Record<NumeralWeight, '200' | '400' | '700'> = {
-  light: '200',
-  regular: '400',
-  bold: '700',
-};
 
 const NIGHT_STARTS_AT = 22;
 const NIGHT_ENDS_AT = 7;

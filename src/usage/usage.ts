@@ -1,5 +1,4 @@
 import { clamp01 } from '@/core/format';
-import { status } from '@/design/palette';
 
 /**
  * Claude subscription limits run on a rolling five-hour session window, with a
@@ -50,16 +49,6 @@ export function levelOf(used: number): UsageLevel {
   if (value >= CRITICAL_AT) return 'critical';
   if (value >= WARN_AT) return 'warn';
   return 'calm';
-}
-
-/**
- * Below the warning threshold the meter stays on the user's accent so it reads
- * as part of the clock; past it, it takes over with a status colour.
- */
-export function levelColor(level: UsageLevel, accentColor: string): string {
-  if (level === 'critical') return status.critical;
-  if (level === 'warn') return status.warn;
-  return accentColor;
 }
 
 export function timeUntilReset(window: UsageWindow, now: number): number {

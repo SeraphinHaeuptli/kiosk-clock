@@ -1,4 +1,22 @@
-import { StyleSheet, type TextStyle } from 'react-native';
+import { Platform, StyleSheet, type TextStyle } from 'react-native';
+
+/**
+ * One typeface throughout. Everything in this app is laid out on a character
+ * grid — the clock glyphs, the meter, the settings rows — which only holds if
+ * every glyph has the same advance width.
+ */
+export const mono = Platform.select({
+  ios: 'Menlo',
+  android: 'monospace',
+  default: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+}) as string;
+
+/**
+ * Advance width of one character as a fraction of font size. Menlo, DejaVu
+ * Sans Mono and their kin all sit at 0.6, which is what lets a glyph grid be
+ * sized from a target width.
+ */
+export const MONO_ASPECT = 0.6;
 
 /** 4-point spacing grid. */
 export const space = {
@@ -10,14 +28,6 @@ export const space = {
   xxl: 32,
 } as const;
 
-export const radius = {
-  sm: 10,
-  md: 14,
-  lg: 20,
-  xl: 28,
-  pill: 999,
-} as const;
-
 export const duration = {
   fast: 180,
   base: 300,
@@ -26,27 +36,18 @@ export const duration = {
 
 export const hairline = StyleSheet.hairlineWidth;
 
-/**
- * Numerals must not reflow as digits change, so every glyph gets the same
- * advance width. Large type also gets tighter tracking, the way SF Pro Display
- * tightens as it scales up.
- */
 export const numerals: TextStyle = {
   fontVariant: ['tabular-nums'],
   includeFontPadding: false,
 };
 
 export function tracking(size: number): number {
-  return size >= 64 ? -size * 0.035 : -size * 0.015;
+  return size >= 64 ? -size * 0.02 : 0;
 }
 
-/** iOS text styles used by the settings surfaces. */
 export const type = {
-  largeTitle: { fontSize: 34, fontWeight: '700', letterSpacing: 0.37 },
-  title: { fontSize: 20, fontWeight: '600', letterSpacing: -0.45 },
-  body: { fontSize: 17, fontWeight: '400', letterSpacing: -0.41 },
-  callout: { fontSize: 16, fontWeight: '400', letterSpacing: -0.32 },
-  footnote: { fontSize: 13, fontWeight: '400', letterSpacing: -0.08 },
-  caption: { fontSize: 12, fontWeight: '500', letterSpacing: 0 },
-  sectionHeader: { fontSize: 13, fontWeight: '400', letterSpacing: 0.5 },
+  heading: { fontFamily: mono, fontSize: 13, letterSpacing: 3 },
+  body: { fontFamily: mono, fontSize: 14, letterSpacing: 0.2 },
+  small: { fontFamily: mono, fontSize: 12, letterSpacing: 0.2 },
+  tiny: { fontFamily: mono, fontSize: 10, letterSpacing: 0.8 },
 } satisfies Record<string, TextStyle>;

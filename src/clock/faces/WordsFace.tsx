@@ -1,14 +1,15 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { label } from '@/design/palette';
+import { mono } from '@/design/tokens';
 
 import type { FaceProps } from './types';
 
 /**
- * Relative to the base numeral size. Sized so the longest token the face can
- * produce — "TWENTY-FIVE" — still fits the narrow axis of a phone.
+ * Relative to the base size. Sized so the longest token the face can produce —
+ * "TWENTY-FIVE" — still fits the narrow axis of a phone.
  */
-const FONT_SCALE = 0.4;
+const FONT_SCALE = 0.34;
 
 const HOURS = [
   'twelve',
@@ -75,7 +76,7 @@ export function toWords(date: Date): Line[] {
   ];
 }
 
-export function WordsFace({ now, accent, size }: FaceProps) {
+export function WordsFace({ now, tone, size }: FaceProps) {
   const font = size * FONT_SCALE;
 
   return (
@@ -86,12 +87,12 @@ export function WordsFace({ now, accent, size }: FaceProps) {
           allowFontScaling={false}
           numberOfLines={1}
           style={{
+            fontFamily: mono,
             fontSize: font,
-            lineHeight: font * 1.2,
-            fontWeight: '700',
-            letterSpacing: font * 0.04,
+            lineHeight: font * 1.3,
+            letterSpacing: font * 0.08,
             textTransform: 'uppercase',
-            color: line.tinted ? accent.color : label.primary,
+            color: line.tinted ? tone.color : label.primary,
           }}
         >
           {line.text}

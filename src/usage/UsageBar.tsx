@@ -1,104 +1,96 @@
-import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 
 import { formatDuration, formatPercent } from '@/core/format';
 import { useNow } from '@/core/useNow';
-import { label, surface } from '@/design/palette';
-import { duration, hairline, numerals, radius, space, type } from '@/design/tokens';
+import { label, surface, type Tone } from '@/design/palette';
+import { MONO_ASPECT, hairline, mono, space, type } from '@/design/tokens';
 
-import { levelColor, levelOf, timeUntilReset, type UsageResult } from './usage';
+import { levelOf, timeUntilReset, type UsageResult } from './usage';
 
-const TRACK_HEIGHT = 5;
-
-function ModePill({ mode }: { mode: UsageResult['mode'] }) {
-  if (mode === 'live') return null;
-  const stale = mode === 'stale';
-
-  return (
-    <View
-      style={[
-        styles.pill,
-        stale && { backgroundColor: 'rgba(255,159,10,0.16)' },
-      ]}
-    >
-      <Text
-        style={[
-          styles.pillText,
-          { color: stale ? '#FF9F0A' : label.tertiary },
-        ]}
-      >
-        {stale ? 'stale' : 'sample'}
-      </Text>
-    </View>
-  );
-}
+const FILL = '█';
+const EMPTY = '░';
+const FONT = 13;
+const MIN_CELLS = 8;
 
 interface Props {
   result: UsageResult | null;
-  accentColor: string;
+  tone: Tone;
 }
 
 /**
- * The Claude session meter. Shows how much of the rolling five-hour allowance
- * is gone and when it rolls over; the weekly allowance rides along on the right.
+ * The Claude session meter, drawn as a character bar.
+ *
+ * The cell count is measured from the laid-out width rather than fixed, so the
+ * bar spans exactly the space available on any display without the ends
+ * drifting away from the text above and below it.
  */
-export function UsageBar({ result, accentColor }: Props) {
+export function UsageBar({ result, tone }: Props) {
   // Its own minute tick: the countdown must keep moving even when the face
   // above it is only redrawing once an hour.
   const now = useNow('minute').getTime();
-  const fill = useRef(new Animated.Value(0)).current;
+  const [cells, setCells] = useState(MIN_CELLS);
 
-  const used = result?.snapshot.session.used ?? 0;
+  const onLayout = (event: LayoutChangeEvent) => {
+    const available = event.nativeEvent.layout.width;
+    // Two cells go to the enclosing brackets.
+    const next = Math.floor(available / (FONT * MONO_ASPECT)) - 2;
+    setCells(Math.max(MIN_CELLS, next));
+  };
 
-  useEffect(() => {
-    Animated.timing(fill, {
-      toValue: used,
-      duration: duration.slow,
-      // Width cannot be driven natively; this animates once a minute at most.
-      useNativeDriver: false,
-    }).start();
-  }, [fill, used]);
-
-  if (!result) return null;
+  if (!result) return <View onLayout={onLayout} />;
 
   const { session, week } = result.snapshot;
-  const color = levelColor(levelOf(used), accentColor);
+  const used = session.used;
+  const filled = Math.round(used * cells);
   const remaining = timeUntilReset(session, now);
+  const critical = levelOf(used) === 'critical';
 
-  const width = fill.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0%', '100%'],
-    extrapolate: 'clamp',
-  });
+  const source =
+    result.mode === 'live' ? null : result.mode === 'stale' ? '[stale]' : '[sample]';
 
   return (
-    <View style={styles.card}>
+    <View style={styles.block} onLayout={onLayout}>
+      <View style={styles.rule} />
+
       <View style={styles.row}>
-        <Text style={styles.title}>Claude session</Text>
-        <Text style={[styles.percent, { color }]} allowFontScaling={false}>
-          {formatPercent(used)}
+        <Text style={styles.title} allowFontScaling={false}>
+          claude session
+        </Text>
+        <Text
+          allowFontScaling={false}
+          style={[
+            styles.percent,
+            { color: tone.color },
+            // Inverse video for the last stretch — a terminal's way of
+            // shouting without reaching for a colour.
+            critical && { backgroundColor: tone.color, color: surface.base },
+          ]}
+        >
+          {` ${formatPercent(used)} `}
         </Text>
       </View>
 
-      <View style={styles.track}>
-        <Animated.View
-          style={[styles.fill, { width, backgroundColor: color }]}
-        />
-      </View>
+      <Text style={styles.bar} allowFontScaling={false} numberOfLines={1}>
+        <Text style={{ color: label.quaternary }}>[</Text>
+        <Text style={{ color: tone.color }}>{FILL.repeat(filled)}</Text>
+        <Text style={{ color: label.quaternary }}>
+          {EMPTY.repeat(Math.max(0, cells - filled))}
+        </Text>
+        <Text style={{ color: label.quaternary }}>]</Text>
+      </Text>
 
       <View style={styles.row}>
-        <View style={styles.footerLeft}>
-          <Text style={styles.meta}>
-            {remaining === 0
-              ? 'Resetting now'
-              : `Resets in ${formatDuration(remaining)}`}
-          </Text>
-          <ModePill mode={result.mode} />
-        </View>
+        <Text style={styles.meta} allowFontScaling={false}>
+          {remaining === 0
+            ? 'resetting now'
+            : `resets in ${formatDuration(remaining)}`}
+          {source ? `  ${source}` : ''}
+        </Text>
 
         {week && (
           <Text style={styles.meta} allowFontScaling={false}>
-            Week {formatPercent(week.used)}
+            week {formatPercent(week.used)}
           </Text>
         )}
       </View>
@@ -107,60 +99,20 @@ export function UsageBar({ result, accentColor }: Props) {
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: surface.glass,
-    borderColor: surface.glassBorder,
-    borderWidth: hairline,
-    borderRadius: radius.lg,
-    borderCurve: 'continuous',
-    paddingHorizontal: space.lg,
-    paddingVertical: space.md,
-    gap: space.sm,
+  block: { gap: space.xs },
+  // A status line sits under a rule, not inside a card.
+  rule: {
+    height: hairline,
+    backgroundColor: surface.line,
+    marginBottom: space.sm,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  footerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.sm,
-  },
-  title: {
-    ...type.footnote,
-    color: label.secondary,
-    fontWeight: '600',
-  },
-  percent: {
-    ...numerals,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  track: {
-    height: TRACK_HEIGHT,
-    borderRadius: TRACK_HEIGHT / 2,
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    overflow: 'hidden',
-  },
-  fill: {
-    height: '100%',
-    borderRadius: TRACK_HEIGHT / 2,
-  },
-  meta: {
-    ...type.caption,
-    color: label.tertiary,
-    fontWeight: '400',
-  },
-  pill: {
-    paddingHorizontal: space.sm,
-    paddingVertical: 2,
-    borderRadius: radius.pill,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  pillText: {
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
+  title: { ...type.small, color: label.secondary },
+  percent: { ...type.small },
+  bar: { fontFamily: mono, fontSize: FONT, lineHeight: FONT * 1.3 },
+  meta: { ...type.tiny, color: label.tertiary },
 });

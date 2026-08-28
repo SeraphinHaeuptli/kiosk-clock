@@ -1,80 +1,65 @@
-import { useState } from 'react';
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FacePicker } from '@/clock/FacePicker';
 import { useSettings } from '@/clock/SettingsContext';
-import type { BackdropId, NumeralWeight } from '@/clock/settings';
+import type { BackdropId } from '@/clock/settings';
 import { useNow } from '@/core/useNow';
-import { label, surface } from '@/design/palette';
-import { hairline, space, type } from '@/design/tokens';
-import { BlockRow, Row, ToggleRow } from '@/ui/Row';
-import { Section } from '@/ui/Section';
-import { Segmented } from '@/ui/Segmented';
-import { Swatches } from '@/ui/Swatches';
-import { FieldRow } from '@/ui/Field';
+import { TONES, label, surface, type ToneId } from '@/design/palette';
+import { space, type } from '@/design/tokens';
+import {
+  ActionRow,
+  CheckRow,
+  ChoiceRow,
+  Heading,
+  StatusRow,
+  TextRow,
+  type Choice,
+} from '@/ui/Terminal';
 import { resolveEndpoint, useUsage } from '@/usage/useUsage';
 
-const BACKDROPS = [
-  { id: 'black', name: 'Black' },
-  { id: 'gradient', name: 'Gradient' },
-  { id: 'aurora', name: 'Aurora' },
-] as const satisfies readonly { id: BackdropId; name: string }[];
+const BACKDROPS: readonly Choice<BackdropId>[] = [
+  { id: 'void', name: 'void' },
+  { id: 'horizon', name: 'horizon' },
+  { id: 'stars', name: 'stars' },
+  { id: 'dither', name: 'dither' },
+];
 
-const WEIGHTS = [
-  { id: 'light', name: 'Light' },
-  { id: 'regular', name: 'Regular' },
-  { id: 'bold', name: 'Bold' },
-] as const satisfies readonly { id: NumeralWeight; name: string }[];
+const TONE_CHOICES: readonly Choice<ToneId>[] = TONES.map((tone) => ({
+  id: tone.id,
+  name: tone.name,
+}));
 
-const USAGE_FOOTER =
-  'Point this at any endpoint returning ' +
-  '{"session":{"used":0.62,"resetsAt":"<ISO date>"}}. ' +
-  '"used" may be a 0–1 fraction, or a count alongside "limit". ' +
-  'An optional "week" object is shown next to the session meter. ' +
-  'Leave empty to display sample data.';
+const USAGE_HINT =
+  'any endpoint returning {"session":{"used":0.62,"resetsAt":"<iso>"}}. ' +
+  '"used" may be a 0-1 fraction, or a count alongside "limit". an optional ' +
+  '"week" object shows beside the session meter. empty = sample data.';
 
 function sourceStatus(
   mode: 'sample' | 'live' | 'stale' | undefined,
   warning: string | undefined,
 ): string {
-  if (mode === 'live') return 'Live';
-  if (mode === 'stale') return `Unreachable — ${warning ?? 'unknown error'}`;
-  return 'Sample data';
+  if (mode === 'live') return 'live';
+  if (mode === 'stale') return `unreachable - ${warning ?? 'unknown error'}`;
+  return 'sample data';
 }
 
 export default function SettingsScreen() {
-  const { settings, accent, update, reset } = useSettings();
+  const { settings, tone, update, reset } = useSettings();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const now = useNow('second');
 
-  // The title bar earns a separator only once content has slid under it, the
-  // way a large-title navigation bar behaves.
-  const [scrolled, setScrolled] = useState(false);
-  const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    setScrolled(event.nativeEvent.contentOffset.y > 4);
-  };
-
-  // Mirrors the kiosk's own source so the status line reflects the real result
-  // of whatever endpoint is currently typed in.
+  // Mirrors the kiosk's own source, so the status line reflects the real
+  // result of whatever endpoint is currently typed in.
   const usage = useUsage(resolveEndpoint(settings.usageEndpoint), true);
 
   const confirmReset = () => {
-    Alert.alert('Reset all settings?', 'The clock returns to its defaults.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Reset', style: 'destructive', onPress: reset },
+    Alert.alert('reset all settings?', 'the clock returns to its defaults.', [
+      { text: 'cancel', style: 'cancel' },
+      { text: 'reset', style: 'destructive', onPress: reset },
     ]);
   };
 
@@ -82,22 +67,20 @@ export default function SettingsScreen() {
     <View style={styles.root}>
       <StatusBar style="light" />
 
-      <View style={[styles.header, { paddingTop: insets.top + space.md }]}>
-        <Text style={styles.title}>Clock</Text>
+      <View style={[styles.header, { paddingTop: insets.top + space.lg }]}>
+        <Text style={styles.brand}>KIOSK</Text>
         <Pressable
           onPress={() => router.back()}
           hitSlop={space.md}
           accessibilityRole="button"
+          accessibilityLabel="Done"
           style={({ pressed }) => pressed && styles.pressed}
         >
-          <Text style={[styles.done, { color: accent.color }]}>Done</Text>
+          <Text style={[styles.done, { color: tone.color }]}>[done]</Text>
         </Pressable>
       </View>
-      <View style={[styles.headerRule, scrolled && styles.headerRuleVisible]} />
 
       <ScrollView
-        onScroll={onScroll}
-        scrollEventThrottle={16}
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,
@@ -106,118 +89,103 @@ export default function SettingsScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
       >
-        <Section title="Face">
-          <BlockRow>
-            <FacePicker
-              now={now}
-              settings={settings}
-              accent={accent}
-              onChange={(face) => update({ face })}
-            />
-          </BlockRow>
-        </Section>
+        <Heading>face</Heading>
+        <FacePicker
+          now={now}
+          settings={settings}
+          tone={tone}
+          onChange={(face) => update({ face })}
+        />
 
-        <Section title="Style">
-          <BlockRow title="Accent">
-            <Swatches
-              value={settings.accent}
-              onChange={(next) => update({ accent: next })}
-            />
-          </BlockRow>
-          <BlockRow title="Background">
-            <Segmented
-              options={BACKDROPS}
-              value={settings.backdrop}
-              onChange={(backdrop) => update({ backdrop })}
-            />
-          </BlockRow>
-          <BlockRow title="Numeral weight">
-            <Segmented
-              options={WEIGHTS}
-              value={settings.weight}
-              onChange={(weight) => update({ weight })}
-            />
-          </BlockRow>
-        </Section>
+        <Heading>tone</Heading>
+        <ChoiceRow
+          options={TONE_CHOICES}
+          value={settings.tone}
+          onChange={(next) => update({ tone: next })}
+          tone={tone}
+        />
 
-        <Section title="Display">
-          <ToggleRow
-            title="24-Hour Time"
-            value={settings.hour12 === false}
-            onValueChange={(on) => update({ hour12: !on })}
-            accentColor={accent.color}
-          />
-          <ToggleRow
-            title="Seconds"
-            value={settings.showSeconds}
-            onValueChange={(showSeconds) => update({ showSeconds })}
-            accentColor={accent.color}
-          />
-          <ToggleRow
-            title="Date"
-            value={settings.showDate}
-            onValueChange={(showDate) => update({ showDate })}
-            accentColor={accent.color}
-          />
-          <ToggleRow
-            title="Usage Counter"
-            value={settings.showUsage}
-            onValueChange={(showUsage) => update({ showUsage })}
-            accentColor={accent.color}
-          />
-        </Section>
+        <Heading>backdrop</Heading>
+        <ChoiceRow
+          options={BACKDROPS}
+          value={settings.backdrop}
+          onChange={(backdrop) => update({ backdrop })}
+          tone={tone}
+        />
+        <Text style={styles.note}>
+          horizon, stars and dither all shift with the time of day.
+        </Text>
 
-        <Section
-          title="Kiosk"
-          footer="Night dimming fades the display between 10 PM and 7 AM. Burn-in protection drifts the clock a few points on a slow cycle."
-        >
-          <ToggleRow
-            title="Keep Screen On"
-            value={settings.keepAwake}
-            onValueChange={(keepAwake) => update({ keepAwake })}
-            accentColor={accent.color}
-          />
-          <ToggleRow
-            title="Night Dimming"
-            value={settings.nightDim}
-            onValueChange={(nightDim) => update({ nightDim })}
-            accentColor={accent.color}
-          />
-          <ToggleRow
-            title="Burn-In Protection"
-            value={settings.burnInGuard}
-            onValueChange={(burnInGuard) => update({ burnInGuard })}
-            accentColor={accent.color}
-          />
-          <ToggleRow
-            title="Landscape"
-            subtitle="Lock the kiosk sideways for a dock or stand"
-            value={settings.landscape}
-            onValueChange={(landscape) => update({ landscape })}
-            accentColor={accent.color}
-          />
-        </Section>
+        <Heading>display</Heading>
+        <CheckRow
+          title="24-hour time"
+          checked={!settings.hour12}
+          onChange={(on) => update({ hour12: !on })}
+          tone={tone}
+        />
+        <CheckRow
+          title="seconds"
+          checked={settings.showSeconds}
+          onChange={(showSeconds) => update({ showSeconds })}
+          tone={tone}
+        />
+        <CheckRow
+          title="date"
+          checked={settings.showDate}
+          onChange={(showDate) => update({ showDate })}
+          tone={tone}
+        />
+        <CheckRow
+          title="usage counter"
+          checked={settings.showUsage}
+          onChange={(showUsage) => update({ showUsage })}
+          tone={tone}
+        />
 
-        <Section title="Claude Usage" footer={USAGE_FOOTER}>
-          <FieldRow
-            title="Endpoint"
-            value={settings.usageEndpoint}
-            placeholder="https://…"
-            onChangeText={(usageEndpoint) => update({ usageEndpoint })}
-          />
-          <Row
-            title="Source"
-            right={
-              <Text style={styles.status} numberOfLines={1}>
-                {sourceStatus(usage.result?.mode, usage.result?.warning)}
-              </Text>
-            }
-          />
-        </Section>
+        <Heading>kiosk</Heading>
+        <CheckRow
+          title="keep screen on"
+          checked={settings.keepAwake}
+          onChange={(keepAwake) => update({ keepAwake })}
+          tone={tone}
+        />
+        <CheckRow
+          title="night dimming"
+          hint="fades the display between 10pm and 7am"
+          checked={settings.nightDim}
+          onChange={(nightDim) => update({ nightDim })}
+          tone={tone}
+        />
+        <CheckRow
+          title="burn-in protection"
+          hint="drifts the clock a few points on a slow cycle"
+          checked={settings.burnInGuard}
+          onChange={(burnInGuard) => update({ burnInGuard })}
+          tone={tone}
+        />
+        <CheckRow
+          title="landscape"
+          hint="lock the kiosk sideways for a dock or stand"
+          checked={settings.landscape}
+          onChange={(landscape) => update({ landscape })}
+          tone={tone}
+        />
 
-        <Section>
-          <Row title="Reset All Settings" destructive onPress={confirmReset} />
-        </Section>
+        <Heading>usage</Heading>
+        <TextRow
+          title="endpoint"
+          value={settings.usageEndpoint}
+          placeholder="https://..."
+          onChangeText={(usageEndpoint) => update({ usageEndpoint })}
+        />
+        <StatusRow
+          title="source"
+          value={sourceStatus(usage.result?.mode, usage.result?.warning)}
+        />
+        <Text style={styles.note}>{USAGE_HINT}</Text>
+
+        <Heading>reset</Heading>
+        <ActionRow title="reset all settings" onPress={confirmReset} />
       </ScrollView>
     </View>
   );
@@ -227,26 +195,20 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: surface.base },
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: space.lg,
     paddingBottom: space.md,
   },
-  headerRule: {
-    height: hairline,
-    backgroundColor: surface.separator,
-    opacity: 0,
-  },
-  headerRuleVisible: { opacity: 1 },
-  title: { ...type.largeTitle, color: label.primary },
-  done: { ...type.body, fontWeight: '600' },
+  brand: { ...type.body, color: label.primary, letterSpacing: 6 },
+  done: { ...type.body },
   pressed: { opacity: 0.5 },
   scroll: { flex: 1 },
-  content: { paddingHorizontal: space.lg, paddingTop: space.md },
-  status: {
-    ...type.footnote,
+  content: { paddingHorizontal: space.lg },
+  note: {
+    ...type.tiny,
     color: label.tertiary,
-    flexShrink: 1,
-    textAlign: 'right',
+    lineHeight: 16,
+    marginTop: space.sm,
   },
 });

@@ -10,7 +10,7 @@ import {
 } from 'react';
 
 import { asyncStorageAdapter, jsonSlot } from '@/core/storage';
-import { accentOf, type Accent } from '@/design/palette';
+import { toneOf, type Tone } from '@/design/palette';
 
 import {
   DEFAULT_SETTINGS,
@@ -22,7 +22,7 @@ const slot = jsonSlot(asyncStorageAdapter, 'kiosk.settings.v1', decodeSettings);
 
 interface SettingsValue {
   settings: ClockSettings;
-  accent: Accent;
+  tone: Tone;
   /** False until stored settings have loaded, so nothing flashes defaults. */
   ready: boolean;
   update: (patch: Partial<ClockSettings>) => void;
@@ -79,7 +79,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const value = useMemo<SettingsValue>(
     () => ({
       settings,
-      accent: accentOf(settings.accent),
+      tone: toneOf(settings.tone),
       ready,
       update,
       reset,

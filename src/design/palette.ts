@@ -1,71 +1,48 @@
 /**
- * Colour system. Values mirror Apple's dark-mode system palette so the app
- * feels native next to iOS built-ins rather than approximating it.
+ * A monochrome system. One ink colour on black, in the tradition of phosphor
+ * terminals — the interface is drawn with characters and rules, not with hue,
+ * so colour carries no meaning here and never has to be decoded.
  */
 
-export type AccentId =
-  | 'blue'
-  | 'indigo'
-  | 'purple'
-  | 'pink'
-  | 'orange'
-  | 'yellow'
-  | 'green'
-  | 'mint';
+export type ToneId = 'white' | 'amber' | 'green';
 
-export interface Accent {
-  id: AccentId;
+export interface Tone {
+  id: ToneId;
   name: string;
-  /** Primary tint: numerals, fills, switches. */
+  /** Full-strength ink: numerals, active labels, meter fill. */
   color: string;
-  /** Companion hue used for the second wash in the aurora backdrop. */
-  companion: string;
+  /** Stepped back, for supporting text that shares the ink. */
+  dim: string;
 }
 
-export const ACCENTS: readonly Accent[] = [
-  { id: 'blue', name: 'Blue', color: '#0A84FF', companion: '#5E5CE6' },
-  { id: 'indigo', name: 'Indigo', color: '#5E5CE6', companion: '#BF5AF2' },
-  { id: 'purple', name: 'Purple', color: '#BF5AF2', companion: '#FF375F' },
-  { id: 'pink', name: 'Pink', color: '#FF375F', companion: '#FF9F0A' },
-  { id: 'orange', name: 'Orange', color: '#FF9F0A', companion: '#FF375F' },
-  { id: 'yellow', name: 'Yellow', color: '#FFD60A', companion: '#FF9F0A' },
-  { id: 'green', name: 'Green', color: '#30D158', companion: '#40C8E0' },
-  { id: 'mint', name: 'Mint', color: '#63E6E2', companion: '#0A84FF' },
+/** The three phosphors: paper-white, IBM amber, and P1 green. */
+export const TONES: readonly Tone[] = [
+  { id: 'white', name: 'white', color: '#E8E8E8', dim: 'rgba(232,232,232,0.45)' },
+  { id: 'amber', name: 'amber', color: '#FFB000', dim: 'rgba(255,176,0,0.45)' },
+  { id: 'green', name: 'green', color: '#33FF66', dim: 'rgba(51,255,102,0.45)' },
 ];
 
-export function accentOf(id: AccentId): Accent {
-  return ACCENTS.find((a) => a.id === id) ?? ACCENTS[0];
+export function toneOf(id: ToneId): Tone {
+  return TONES.find((tone) => tone.id === id) ?? TONES[0];
 }
 
-/** Text colours, matching iOS dark-mode label roles. */
+/** Neutral text, independent of the chosen tone. */
 export const label = {
-  primary: '#FFFFFF',
-  secondary: 'rgba(235,235,245,0.60)',
-  tertiary: 'rgba(235,235,245,0.30)',
-  quaternary: 'rgba(235,235,245,0.18)',
+  primary: '#E8E8E8',
+  secondary: 'rgba(232,232,232,0.55)',
+  tertiary: 'rgba(232,232,232,0.32)',
+  quaternary: 'rgba(232,232,232,0.16)',
 } as const;
 
-/** Backgrounds and separators, matching iOS dark-mode system greys. */
 export const surface = {
-  /** True black: the kiosk canvas, and what OLED panels actually switch off. */
-  kiosk: '#000000',
   base: '#000000',
-  grouped: '#1C1C1E',
-  raised: '#2C2C2E',
-  control: '#3A3A3C',
-  separator: 'rgba(84,84,88,0.65)',
-  /** Translucent chrome that sits over the kiosk canvas. */
-  glass: 'rgba(255,255,255,0.07)',
-  glassBorder: 'rgba(255,255,255,0.12)',
+  kiosk: '#000000',
+  /** Hairline rules and inactive borders. */
+  line: 'rgba(232,232,232,0.18)',
+  faint: 'rgba(232,232,232,0.07)',
 } as const;
 
-/** Status colours for the usage meter. */
-export const status = {
-  warn: '#FF9F0A',
-  critical: '#FF453A',
-} as const;
-
-/** Re-express a `#RRGGBB` accent at a given alpha, for washes and glows. */
+/** Re-express a `#RRGGBB` colour at a given alpha. */
 export function withAlpha(hex: string, alpha: number): string {
   const value = hex.replace('#', '');
   const r = parseInt(value.slice(0, 2), 16);
