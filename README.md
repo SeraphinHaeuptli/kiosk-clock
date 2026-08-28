@@ -166,6 +166,15 @@ plausible numbers is worse than no source:
 
 ## Platform notes
 
+**The monospace font is bundled, not borrowed.** Everything here sits on a
+character grid, which only holds if every glyph has the same advance width.
+Asking the platform for `monospace` does not guarantee that — Android OEM
+skins substitute system fonts, and on a Galaxy S10 the alias resolved to a
+proportional face, which collapsed the grid and smeared the character art into
+illegibility. Shipping JetBrains Mono removes the variable: its advance is
+exactly 0.6 em, which is the ratio the layout assumes, and every glyph the art
+uses measures identically.
+
 The ASCII face authors its digits as a 5x7 grid of `#` and ` `, then subdivides
 each cell into a patch of small characters chosen by how buried the cell is in
 the shape. Every character it uses is plain ASCII, so there is no exotic glyph

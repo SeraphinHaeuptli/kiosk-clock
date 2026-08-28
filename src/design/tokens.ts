@@ -1,14 +1,23 @@
 import { Platform, StyleSheet, type TextStyle } from 'react-native';
 
 /**
- * One typeface throughout. Everything in this app is laid out on a character
- * grid — the clock glyphs, the meter, the settings rows — which only holds if
- * every glyph has the same advance width.
+ * One typeface throughout, bundled rather than borrowed.
+ *
+ * Everything here is laid out on a character grid — the clock glyphs, the
+ * meter, the settings rows — which only holds if every glyph has the same
+ * advance width. Asking the platform for "monospace" does not guarantee that:
+ * Android OEM skins substitute system fonts, and where the alias resolves to a
+ * proportional face the grid collapses and the character art smears into
+ * illegibility. Shipping the font removes the variable entirely.
+ *
+ * Web gets a fallback stack because CSS accepts one; native needs a single
+ * resolved family name.
  */
+export const MONO_FAMILY = 'JetBrainsMono_400Regular';
+
 export const mono = Platform.select({
-  ios: 'Menlo',
-  android: 'monospace',
-  default: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+  web: `${MONO_FAMILY}, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`,
+  default: MONO_FAMILY,
 }) as string;
 
 /**

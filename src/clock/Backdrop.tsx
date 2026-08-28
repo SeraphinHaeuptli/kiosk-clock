@@ -154,7 +154,7 @@ const WAVE_LINE = 15;
 /** Blank through dense. The leading space is what lets the field breathe. */
 const WAVE_RAMP = [' ', '.', ':', '-', '=', '+', '*', '#'];
 /** Below this the field is blank, so the wave reads as crests, not a wash. */
-const WAVE_FLOOR = 0.42;
+const WAVE_FLOOR = 0.46;
 
 /**
  * One frame interval for every speed. Speed changes how far the field
@@ -240,7 +240,7 @@ function Wave({
           fontSize: WAVE_FONT,
           lineHeight: WAVE_LINE,
           color: tone.color,
-          opacity: 0.17,
+          opacity: 0.30,
         }}
       >
         {lines.join('\n')}
