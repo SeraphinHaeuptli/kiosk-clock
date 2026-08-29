@@ -116,11 +116,14 @@ export function TextRow({
   value,
   placeholder,
   onChangeText,
+  kind = 'url',
 }: {
   title: string;
   value: string;
   placeholder?: string;
   onChangeText: (next: string) => void;
+  /** Which keyboard to raise. A place name on a URL keyboard is a bad time. */
+  kind?: 'url' | 'text';
 }) {
   return (
     <View style={styles.field}>
@@ -133,8 +136,8 @@ export function TextRow({
         style={styles.input}
         autoCapitalize="none"
         autoCorrect={false}
-        keyboardType="url"
-        inputMode="url"
+        keyboardType={kind === 'url' ? 'url' : 'default'}
+        inputMode={kind === 'url' ? 'url' : 'text'}
         returnKeyType="done"
         selectionColor={label.secondary}
         accessibilityLabel={title}

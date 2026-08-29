@@ -31,6 +31,8 @@ import {
   resolveNowPlayingEndpoint,
   useNowPlaying,
 } from '@/media/useNowPlaying';
+import { useWeather, type WeatherStatus } from '@/weather/useWeather';
+import type { TemperatureUnit } from '@/weather/weather';
 
 const BACKDROP_NAMES: readonly Choice<BackdropId>[] = [
   { id: 'void', name: 'void' },
@@ -64,11 +66,38 @@ const TONE_NAMES: readonly Choice<ToneId>[] = TONES.map((tone) => ({
   name: tone.name,
 }));
 
+const UNITS: readonly Choice<TemperatureUnit>[] = [
+  { id: 'celsius', name: 'celsius' },
+  { id: 'fahrenheit', name: 'fahrenheit' },
+];
+
+/**
+ * Attribution, which is not decoration: both services are free to use on the
+ * condition that they are credited, and this line is where that is paid.
+ */
+const WEATHER_HINT =
+  'a city, a postcode or an address — looked up once and remembered. ' +
+  'forecast by the norwegian meteorological institute (met.no), places by ' +
+  'openstreetmap nominatim, both under cc by 4.0.';
+
 const AUDIO_HINT =
   'android reads the device media session directly once notification access ' +
   'is granted. the endpoint is the fallback, and the only option on ios: any ' +
   'url returning {"title":"...","artist":"...","playing":true}, such as a ' +
   'playerctl or mpris wrapper on the machine doing the playing.';
+
+function weatherStatus(status: WeatherStatus, place: string | null): string {
+  switch (status.kind) {
+    case 'off':
+      return 'no location set';
+    case 'resolving':
+      return 'looking up the location...';
+    case 'live':
+      return place ? `live for ${place}` : 'live';
+    case 'failed':
+      return `unavailable - ${status.reason}`;
+  }
+}
 
 function sourceStatus(
   mode: 'none' | 'live' | 'stale' | undefined,
@@ -123,6 +152,10 @@ export default function SettingsScreen() {
     resolveNowPlayingEndpoint(settings.nowPlayingEndpoint),
     true,
   );
+
+  // Mirrors the kiosk's own weather, so the status line reports the real
+  // result of whatever is currently typed in the field below it.
+  const weather = useWeather(settings.weatherPlace, settings.showWeather);
 
   const confirmReset = () => {
     Alert.alert('reset all settings?', 'the clock returns to its defaults.', [
@@ -279,6 +312,33 @@ export default function SettingsScreen() {
           onChange={(landscape) => update({ landscape })}
           tone={tone}
         />
+
+        <Heading>weather</Heading>
+        <CheckRow
+          title="weather corners"
+          hint="temperature and conditions across the top of the clock"
+          checked={settings.showWeather}
+          onChange={(showWeather) => update({ showWeather })}
+          tone={tone}
+        />
+        <TextRow
+          title="location"
+          value={settings.weatherPlace}
+          placeholder="zurich"
+          onChangeText={(weatherPlace) => update({ weatherPlace })}
+          kind="text"
+        />
+        <ChoiceRow
+          options={UNITS}
+          value={settings.weatherUnit}
+          onChange={(weatherUnit) => update({ weatherUnit })}
+          tone={tone}
+        />
+        <StatusRow
+          title="source"
+          value={weatherStatus(weather.status, weather.place?.label ?? null)}
+        />
+        <Text style={styles.note}>{WEATHER_HINT}</Text>
 
         <Heading>now playing</Heading>
         <TextRow

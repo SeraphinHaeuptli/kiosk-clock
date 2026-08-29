@@ -146,6 +146,14 @@ landscape lock for a dock or stand, and both system bars — status and
 navigation — hidden while the clock is up, re-asserted on every rotation.
 Tap anywhere for the settings button; it fades out again after four seconds.
 
+**Weather in the corners.** Temperature and conditions top left, the place
+and the rest of the day's range top right, for whatever location you type into
+settings. The right corner and the settings button share their corner: touch
+the screen and one fades out exactly as the other fades in. Neither corner
+ever shows an error — a clock with a stack trace where the temperature goes is
+worse than one showing nothing, and settings is where a bad location gets
+explained, because that is where it can be fixed.
+
 **Audio bar.** What is playing, over a volume control you drag sideways. The
 gesture is relative rather than absolute: a swipe moves the level by how far
 the finger travelled, so a stray tap on the bar cannot slam the volume to
@@ -170,6 +178,37 @@ playBilling.ts` carries the recipe for the Google Play adapter that replaces
 it — the product type to create, why an unacknowledged purchase is refunded
 after three days, and why the price string has to come from the store rather
 than from a constant.
+
+## Where the weather comes from
+
+Two free services, both keyless, chosen in that order for a reason.
+
+**Forecast: [MET Norway](https://api.met.no/)** (`locationforecast/2.0`). No
+API key — a key shipped inside an APK is a key anyone can pull back out of it
+— and the data is CC BY 4.0, which permits commercial use. Open-Meteo is the
+nicer API and was the first choice until its terms settled it: the free tier
+is non-commercial only, and this app sells a founder pack.
+
+**Places: [Nominatim](https://nominatim.openstreetmap.org/)**, so a typed name
+can become coordinates. MET does not geocode.
+
+Both are paid for by somebody else, and both ask the same three things:
+
+- **Identify yourself.** A real User-Agent with contact information, set in
+  `src/weather/source.ts`. A generic one is blocked rather than throttled. If
+  you fork this and publish it, change that string — it is how the operators
+  reach whoever is generating the traffic.
+- **Do not ask more often than the data changes.** The forecast is polled
+  every thirty minutes; a place name is geocoded once, ever, and the answer is
+  written to storage. Coordinates are truncated to four decimals because MET's
+  cache is keyed on them, so full float precision turns every request into a
+  miss.
+- **Attribute.** The settings screen credits both.
+
+One platform note: browsers forbid setting `User-Agent` from `fetch`, so on
+the web build the header is silently dropped and the request may be refused or
+fail CORS. Android sets it properly, which is the platform this is a kiosk
+for.
 
 ## Connecting now playing
 
@@ -311,6 +350,11 @@ src/
     index.ts            Picks the live port — one line to switch
     BillingContext.tsx  Entitlement state
     Watermark.tsx       The mark over unpaid content
+  weather/
+    weather.ts          Domain + total decoders over two foreign payloads
+    source.ts           MET Norway and Nominatim, and the terms they carry
+    useWeather.ts       Cached place resolution, forecast on a timer
+    WeatherCorners.tsx  The two corner readouts
   ui/Terminal.tsx       Headings, checks, choices, fields
 
 modules/now-playing/    Local Android module: a NotificationListenerService
@@ -330,6 +374,10 @@ exists.
   size, the digital face barely one — and the screen sizes each from the box it
   measured rather than from a single screen-derived guess. Getting this wrong
   is what made the tall faces overflow in landscape.
+- Every decoder over a third-party payload is total: it takes `unknown`,
+  returns null on anything it does not recognise, and never throws. The
+  weather services are other people's, and a clock is not allowed to crash
+  because a forecast changed shape.
 - Settings loaded from disk go through `decodeSettings`, which falls back to
   defaults per field. Stored data outlives the schema that wrote it — including
   settings naming faces, backdrops or accent colours that no longer exist.

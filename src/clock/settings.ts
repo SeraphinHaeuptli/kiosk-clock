@@ -1,4 +1,5 @@
 import { TONES, type ToneId } from '@/design/palette';
+import type { TemperatureUnit } from '@/weather/weather';
 
 export type FaceId =
   | 'ascii'
@@ -50,6 +51,12 @@ export interface ClockSettings {
 
   /** Optional HTTP source for now-playing metadata. Empty means no source. */
   nowPlayingEndpoint: string;
+
+  /** Weather in the top corners. Silent until a place is set. */
+  showWeather: boolean;
+  /** Free text, geocoded once: "zurich", "10 Downing Street", "Kyoto". */
+  weatherPlace: string;
+  weatherUnit: TemperatureUnit;
 }
 
 export const DEFAULT_SETTINGS: ClockSettings = {
@@ -73,6 +80,10 @@ export const DEFAULT_SETTINGS: ClockSettings = {
   landscape: false,
 
   nowPlayingEndpoint: '',
+
+  showWeather: true,
+  weatherPlace: '',
+  weatherUnit: 'celsius',
 };
 
 const FACES: readonly FaceId[] = [
@@ -96,6 +107,7 @@ const BACKDROPS: readonly BackdropId[] = [
   'rain',
 ];
 const WAVE_SPEEDS: readonly WaveSpeed[] = ['still', 'slow', 'medium', 'fast'];
+const TEMPERATURE_UNITS: readonly TemperatureUnit[] = ['celsius', 'fahrenheit'];
 const WAVE_SCALES: readonly WaveScale[] = ['fine', 'medium', 'coarse'];
 
 function oneOf<T extends string>(
@@ -150,6 +162,17 @@ export function decodeSettings(raw: unknown): ClockSettings {
       typeof input.nowPlayingEndpoint === 'string'
         ? input.nowPlayingEndpoint.trim()
         : DEFAULT_SETTINGS.nowPlayingEndpoint,
+
+    showWeather: bool(input.showWeather, DEFAULT_SETTINGS.showWeather),
+    weatherPlace:
+      typeof input.weatherPlace === 'string'
+        ? input.weatherPlace.trim()
+        : DEFAULT_SETTINGS.weatherPlace,
+    weatherUnit: oneOf(
+      TEMPERATURE_UNITS,
+      input.weatherUnit,
+      DEFAULT_SETTINGS.weatherUnit,
+    ),
   };
 }
 

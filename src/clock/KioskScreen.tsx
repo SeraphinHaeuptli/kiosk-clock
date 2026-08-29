@@ -37,6 +37,8 @@ import {
   useNowPlaying,
 } from '@/media/useNowPlaying';
 import { useVolume } from '@/media/useVolume';
+import { WeatherNow, WeatherPlace } from '@/weather/WeatherCorners';
+import { useWeather } from '@/weather/useWeather';
 
 import { Backdrop } from './Backdrop';
 import { BurnInGuard } from './BurnInGuard';
@@ -85,6 +87,7 @@ export function KioskScreen() {
     settings.showMedia,
   );
   const volume = useVolume(settings.showMedia);
+  const weather = useWeather(settings.weatherPlace, settings.showWeather);
 
   /* -- Kiosk behaviours ---------------------------------------------------- */
 
@@ -146,6 +149,16 @@ export function KioskScreen() {
   /* -- Tap-to-reveal chrome ------------------------------------------------ */
 
   const chrome = useRef(new Animated.Value(0)).current;
+  /**
+   * The right corner holds two things that both want it: the place and range
+   * when the clock is just sitting there, and the settings button once you
+   * touch it. Rather than crowd them side by side, they trade — one fades out
+   * exactly as the other fades in, off the same value.
+   */
+  const chromeOut = chrome.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
   const [armed, setArmed] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -259,23 +272,48 @@ export function KioskScreen() {
           },
         ]}
       >
-        <Animated.View
-          pointerEvents={armed ? 'auto' : 'none'}
-          style={[styles.header, { opacity: chrome }]}
-        >
-          <Pressable
-            onPress={() => router.push('/settings')}
-            style={({ pressed }) => [
-              styles.controlButton,
-              pressed && styles.controlButtonPressed,
-            ]}
-            hitSlop={space.md}
-            accessibilityRole="button"
-            accessibilityLabel="Clock settings"
-          >
-            <MenuGlyph size={16} color={label.primary} />
-          </Pressable>
-        </Animated.View>
+        <BurnInGuard enabled={settings.burnInGuard} style={styles.header}>
+          {/* Always rendered, empty or not: it is the left half of the row,
+              and without it the right half stops being in the corner. */}
+          <Animated.View pointerEvents="none" style={{ opacity: dim }}>
+            <WeatherNow
+              weather={weather.weather}
+              unit={settings.weatherUnit}
+              tone={tone}
+            />
+          </Animated.View>
+
+          <View style={styles.headerRight}>
+            <Animated.View
+              pointerEvents="none"
+              style={{ opacity: Animated.multiply(dim, chromeOut) }}
+            >
+              <WeatherPlace
+                weather={weather.weather}
+                place={weather.place?.label ?? ''}
+                unit={settings.weatherUnit}
+              />
+            </Animated.View>
+
+            <Animated.View
+              pointerEvents={armed ? 'auto' : 'none'}
+              style={[styles.menuSlot, { opacity: chrome }]}
+            >
+              <Pressable
+                onPress={() => router.push('/settings')}
+                style={({ pressed }) => [
+                  styles.controlButton,
+                  pressed && styles.controlButtonPressed,
+                ]}
+                hitSlop={space.md}
+                accessibilityRole="button"
+                accessibilityLabel="Clock settings"
+              >
+                <MenuGlyph size={16} color={label.primary} />
+              </Pressable>
+            </Animated.View>
+          </View>
+        </BurnInGuard>
 
         <Animated.View
           pointerEvents="none"
@@ -327,7 +365,13 @@ export function KioskScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: surface.kiosk },
   content: { flex: 1, flexDirection: 'column' },
-  header: { flexDirection: 'row', justifyContent: 'flex-end' },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  headerRight: { alignItems: 'flex-end', minHeight: 40, minWidth: 40 },
+  menuSlot: { position: 'absolute', top: 0, right: 0 },
   controlButton: {
     width: 40,
     height: 40,
