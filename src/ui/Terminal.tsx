@@ -55,6 +55,12 @@ export function CheckRow({
 export interface Choice<T extends string> {
   id: T;
   name: string;
+  /**
+   * Marks the option as paid. It stays selectable — picking it is how you
+   * try it — but carries a trailing asterisk so the row says which options
+   * cost something without a second column or a legend.
+   */
+  locked?: boolean;
 }
 
 /**
@@ -77,6 +83,7 @@ export function ChoiceRow<T extends string>({
     <View style={styles.choices}>
       {options.map((option) => {
         const selected = option.id === value;
+        const name = option.locked ? `${option.name}*` : option.name;
 
         return (
           <Pressable
@@ -94,7 +101,7 @@ export function ChoiceRow<T extends string>({
                 { color: selected ? tone.color : label.tertiary },
               ]}
             >
-              {selected ? `[${option.name}]` : ` ${option.name} `}
+              {selected ? `[${name}]` : ` ${name} `}
             </Text>
           </Pressable>
         );

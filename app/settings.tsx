@@ -1,8 +1,11 @@
+import { useMemo } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useBilling } from '@/billing/BillingContext';
+import { backdropNeedsFounder } from '@/billing/catalog';
 import { FacePicker } from '@/clock/FacePicker';
 import { useSettings } from '@/clock/SettingsContext';
 import type {
@@ -29,7 +32,7 @@ import {
   useNowPlaying,
 } from '@/media/useNowPlaying';
 
-const BACKDROPS: readonly Choice<BackdropId>[] = [
+const BACKDROP_NAMES: readonly Choice<BackdropId>[] = [
   { id: 'void', name: 'void' },
   { id: 'horizon', name: 'horizon' },
   { id: 'stars', name: 'stars' },
@@ -78,9 +81,21 @@ function sourceStatus(
 
 export default function SettingsScreen() {
   const { settings, tone, update, reset } = useSettings();
+  const { founder } = useBilling();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const now = useNow('second');
+
+  // Locked backdrops stay pickable — choosing one is how you see it, complete
+  // with the watermark that comes with not having paid for it.
+  const backdrops = useMemo<readonly Choice<BackdropId>[]>(
+    () =>
+      BACKDROP_NAMES.map((choice) => ({
+        ...choice,
+        locked: !founder && backdropNeedsFounder(choice.id),
+      })),
+    [founder],
+  );
 
   // Mirrors the kiosk's own source, so the status line reflects the real
   // result of whatever endpoint is currently typed in.
@@ -140,7 +155,7 @@ export default function SettingsScreen() {
 
         <Heading>backdrop</Heading>
         <ChoiceRow
-          options={BACKDROPS}
+          options={backdrops}
           value={settings.backdrop}
           onChange={(backdrop) => update({ backdrop })}
           tone={tone}
@@ -148,6 +163,7 @@ export default function SettingsScreen() {
         <Text style={styles.note}>
           horizon, stars and dither shift with the time of day. wave is a
           perlin noise field with its own controls.
+          {!founder && ' starred options need the founder pack.'}
         </Text>
 
         <ChoiceRow
@@ -262,6 +278,16 @@ export default function SettingsScreen() {
           />
         )}
         <Text style={styles.note}>{AUDIO_HINT}</Text>
+
+        <Heading>founder</Heading>
+        <StatusRow
+          title="founder pack"
+          value={founder ? 'unlocked' : 'not bought'}
+        />
+        <ActionRow
+          title={founder ? 'what the pack includes' : 'unlock the founder pack'}
+          onPress={() => router.push('/founder')}
+        />
 
         <Heading>reset</Heading>
         <ActionRow title="reset all settings" onPress={confirmReset} />

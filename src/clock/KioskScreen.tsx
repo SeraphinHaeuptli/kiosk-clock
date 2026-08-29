@@ -18,6 +18,9 @@ import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useBilling } from '@/billing/BillingContext';
+import { backdropNeedsFounder, faceNeedsFounder } from '@/billing/catalog';
+import { Watermark } from '@/billing/Watermark';
 import { daylight } from '@/core/daylight';
 import { longDate } from '@/core/format';
 import { useNow } from '@/core/useNow';
@@ -62,6 +65,7 @@ const MIN_FACE_SIZE = 14;
 
 export function KioskScreen() {
   const { settings, tone, ready } = useSettings();
+  const billing = useBilling();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -181,6 +185,19 @@ export function KioskScreen() {
     if (w > 0 && h > 0) setBox({ width: w, height: h });
   };
 
+  /**
+   * Whether the clock on screen right now is asking for money.
+   *
+   * Gated on the billing layer being ready as well as unowned: entitlements
+   * load asynchronously, and defaulting to "locked" for those few frames
+   * would flash the watermark across a paying customer's clock on every cold
+   * start.
+   */
+  const watermarked =
+    billing.ready &&
+    !billing.founder &&
+    (faceNeedsFounder(settings.face) || backdropNeedsFounder(settings.backdrop));
+
   const face = faceOf(settings.face);
   const dateAllowance = settings.showDate ? DATE_ALLOWANCE : 0;
   const faceSize = Math.max(
@@ -285,6 +302,14 @@ export function KioskScreen() {
           </Animated.View>
         )}
       </View>
+
+      {/*
+        Last in the tree, and outside every dimming layer, so nothing draws
+        over it and night dimming cannot fade it away.
+      */}
+      {watermarked && (
+        <Watermark tone={tone} onPress={() => router.push('/founder')} />
+      )}
     </View>
   );
 }

@@ -140,6 +140,20 @@ the finger travelled, so a stray tap on the bar cannot slam the volume to
 wherever it landed — the wrong behaviour for a device sitting on a desk. One
 haptic tick per cell crossed, the way a physical volume wheel detents.
 
+**Founder pack.** A one-off purchase that unlocks the stack, analog and words
+faces and the horizon, stars and dither backdrops. Locked options are not
+hidden or disabled — they run in full on the real clock, under a watermark
+that pulses across the whole screen and sits above the night dimming. The
+trade is deliberate: you can judge the thing by using it, and the only cost of
+not paying is having to look at that.
+
+The store behind it is a port, and the build ships the local stand-in: a
+purchase is written to device storage and no money moves. `src/billing/
+playBilling.ts` carries the recipe for the Google Play adapter that replaces
+it — the product type to create, why an unacknowledged purchase is refunded
+after three days, and why the price string has to come from the store rather
+than from a constant.
+
 ## Connecting now playing
 
 The bar reads "nothing playing" until you point it at an endpoint, either in
@@ -248,9 +262,10 @@ instead of crashing the clock behind it.
 
 ```
 app/                    Routes only — thin wrappers around screens
-  _layout.tsx           Providers + stack (settings is a modal)
+  _layout.tsx           Providers + stack (settings and founder are modals)
   index.tsx             Kiosk
   settings.tsx          Settings
+  founder.tsx           What the pack unlocks, and buying it
 
 src/
   design/               Tokens and the monochrome palette
@@ -271,6 +286,14 @@ src/
     nowPlaying.ts       Domain + HTTP source with live / none / stale
     useNowPlaying.ts    Refresh on mount, on an interval, and on foreground
     MediaBar.tsx        Now playing + the swipeable volume bar
+  billing/
+    catalog.ts          What is for sale and what it unlocks
+    port.ts             The store interface everything above depends on
+    testBilling.ts      Local stand-in: writes to storage, charges nothing
+    playBilling.ts      The seam for Google Play, and how to fill it in
+    index.ts            Picks the live port — one line to switch
+    BillingContext.tsx  Entitlement state
+    Watermark.tsx       The mark over unpaid content
   ui/Terminal.tsx       Headings, checks, choices, fields
 
 modules/now-playing/    Local Android module: a NotificationListenerService
@@ -297,6 +320,12 @@ exists.
 - No hardcoded colours outside `src/design/palette.ts`.
 - Backdrops receive a quantised `light` value rather than the current time, so
   the memo holds and they redraw a few times an hour instead of once a second.
+- What the founder pack gates lives in `src/billing/catalog.ts` and nowhere
+  else. The face registry and the settings screen ask it; they do not carry
+  their own flags.
+- Anything that gates on ownership waits for `useBilling().ready`. Entitlements
+  load asynchronously, and treating "not loaded yet" as "not bought" flashes a
+  watermark across a paying customer's clock on every cold start.
 
 ## Verified
 

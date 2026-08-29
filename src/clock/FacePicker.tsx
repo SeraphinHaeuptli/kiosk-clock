@@ -1,5 +1,8 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { useBilling } from '@/billing/BillingContext';
+import { faceNeedsFounder } from '@/billing/catalog';
+import { WatermarkTag } from '@/billing/Watermark';
 import { label, surface, type Tone } from '@/design/palette';
 import { hairline, space, type } from '@/design/tokens';
 
@@ -24,6 +27,8 @@ export function FacePicker({
   tone: Tone;
   onChange: (face: FaceId) => void;
 }) {
+  const { founder } = useBilling();
+
   return (
     <ScrollView
       horizontal
@@ -32,13 +37,19 @@ export function FacePicker({
     >
       {FACES.map((face) => {
         const selected = face.id === settings.face;
+        // Locked faces still render live and stay selectable: seeing the real
+        // thing at thumbnail scale is the whole argument for buying it.
+        const locked = !founder && faceNeedsFounder(face.id);
+        const name = locked ? `${face.name}*` : face.name;
 
         return (
           <Pressable
             key={face.id}
             onPress={() => onChange(face.id)}
             accessibilityRole="radio"
-            accessibilityLabel={`${face.name} face`}
+            accessibilityLabel={
+              locked ? `${face.name} face, founder pack` : `${face.name} face`
+            }
             accessibilityState={{ selected }}
             style={({ pressed }) => pressed && styles.pressed}
           >
@@ -51,6 +62,7 @@ export function FacePicker({
                 tone={tone}
                 size={face.previewSize}
               />
+              {locked && <WatermarkTag tone={tone} />}
             </View>
 
             <Text
@@ -60,7 +72,7 @@ export function FacePicker({
               ]}
               numberOfLines={1}
             >
-              {selected ? `[${face.name}]` : ` ${face.name} `}
+              {selected ? `[${name}]` : ` ${name} `}
             </Text>
           </Pressable>
         );
