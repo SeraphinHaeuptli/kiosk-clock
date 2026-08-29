@@ -1,5 +1,11 @@
-import { memo, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Animated,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { createNoiseField } from '@/core/perlin';
@@ -274,6 +280,355 @@ function Wave({
   );
 }
 
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Where the horizon sits, as a fraction of screen height. Below the centre,
+ * so the vanishing point falls under the clock rather than through it.
+ */
+const GRID_HORIZON = 0.6;
+/** Lines each way. More than this and the far end packs into a solid band. */
+const GRID_DEPTH = 13;
+const GRID_COLUMNS = 15;
+/** How hard the rows bunch toward the horizon. 1 would be no perspective. */
+const GRID_FALLOFF = 2.4;
+const GRID_FLOOR = 0.4;
+
+/**
+ * A ground plane running to a vanishing point.
+ *
+ * Rows are spaced on a power curve so they crowd toward the horizon, and the
+ * columns are placed by where they cross the bottom edge rather than by even
+ * angles — that is what makes the fan converge like a plane seen edge-on
+ * instead of like a paper fan.
+ *
+ * Each column is a line inside a box twice its length, centred on the
+ * vanishing point, so rotating the box turns the line about the point where
+ * they all meet. React Native has no transform-origin, and this is the same
+ * trick the analog face uses to pivot its hands.
+ */
+function Grid({ tone, light }: { tone: Tone; light: number }) {
+  const { width, height } = useWindowDimensions();
+
+  const horizon = height * GRID_HORIZON;
+  const depth = height - horizon;
+  const centre = width / 2;
+  // Long enough to leave the screen at the widest angle it is drawn at.
+  const reach = Math.hypot(width, depth) * 1.2;
+
+  const strength = withFloor(light, GRID_FLOOR);
+  // Measured against the other backdrops rather than guessed: at twice this
+  // the grid peaked around 137 of 255 where the wave and dither fields sit at
+  // 55 to 70, and it stopped being a backdrop and started being the subject.
+  const ink = withAlpha(tone.color, 0.055 + strength * 0.1);
+  const glow = withAlpha(tone.color, 0.04 + strength * 0.08);
+
+  const rows = useMemo(
+    () =>
+      Array.from(
+        { length: GRID_DEPTH },
+        (_, index) =>
+          horizon + depth * Math.pow((index + 1) / GRID_DEPTH, GRID_FALLOFF),
+      ),
+    [horizon, depth],
+  );
+
+  const angles = useMemo(
+    () =>
+      Array.from({ length: GRID_COLUMNS }, (_, index) => {
+        // Spread the columns across three screen widths at the bottom edge, so
+        // the outermost pair leaves the frame rather than stopping inside it.
+        const spread = (index / (GRID_COLUMNS - 1) - 0.5) * width * 3;
+        return (Math.atan2(spread, depth) * 180) / Math.PI;
+      }),
+    [width, depth],
+  );
+
+  return (
+    <View style={[StyleSheet.absoluteFill, styles.clip]} pointerEvents="none">
+      {/* A haze at the horizon, where a real plane meets the sky. */}
+      <LinearGradient
+        colors={[glow, 'rgba(0,0,0,0)']}
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: horizon - depth * 0.28,
+          height: depth * 0.28,
+        }}
+      />
+
+      <View
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: horizon,
+          height: 1,
+          // The one line allowed to be brighter than the rest: it is the
+          // edge the whole construction reads from.
+          backgroundColor: withAlpha(tone.color, 0.1 + strength * 0.14),
+        }}
+      />
+
+      {rows.map((top, index) => (
+        <View
+          key={`row-${index}`}
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top,
+            height: 1,
+            backgroundColor: ink,
+          }}
+        />
+      ))}
+
+      {angles.map((angle, index) => (
+        <View
+          key={`column-${index}`}
+          style={{
+            position: 'absolute',
+            left: centre - 1,
+            top: horizon - reach,
+            width: 2,
+            height: reach * 2,
+            transform: [{ rotate: `${angle}deg` }],
+          }}
+        >
+          <View
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: reach,
+              width: 1,
+              height: reach,
+              backgroundColor: ink,
+            }}
+          />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Distance between scanlines, in points. Opened up from six alongside the
+ * brightness below: the lines had to get stronger to be visible at all, and
+ * at the old pitch that turned an even texture into a veil.
+ */
+const SCAN_PITCH = 8;
+/** How far down the screen the bright band travels, and how long it takes. */
+const SCAN_SWEEP_MS = 7_000;
+const SCAN_BAND = 220;
+const SCAN_FLOOR = 0.45;
+
+/**
+ * A CRT.
+ *
+ * Two effects at once: the fixed line structure of a shadow mask, and the slow
+ * bright roll of a tube that is very slightly out of sync. The roll is the
+ * part that makes it read as a screen rather than as a hatch pattern, and it
+ * runs on the native driver so it costs nothing per frame on the JS thread.
+ */
+function Scan({ tone, light }: { tone: Tone; light: number }) {
+  const { height } = useWindowDimensions();
+  const sweep = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(sweep, {
+        toValue: 1,
+        duration: SCAN_SWEEP_MS,
+        useNativeDriver: true,
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [sweep]);
+
+  const strength = withFloor(light, SCAN_FLOOR);
+  const lines = Math.ceil(height / SCAN_PITCH);
+  // At half this the whole effect peaked at 30 of 255 — under what a phone
+  // shows in a lit room, which is the same failure the dither field had.
+  const ink = withAlpha(tone.color, 0.09 + strength * 0.15);
+
+  const translateY = sweep.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-SCAN_BAND, height],
+  });
+
+  return (
+    <View style={[StyleSheet.absoluteFill, styles.clip]} pointerEvents="none">
+      {Array.from({ length: lines }, (_, index) => (
+        <View
+          key={index}
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: index * SCAN_PITCH,
+            height: 1,
+            backgroundColor: ink,
+          }}
+        />
+      ))}
+
+      <Animated.View
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          height: SCAN_BAND,
+          transform: [{ translateY }],
+        }}
+      >
+        <LinearGradient
+          colors={[
+            'rgba(0,0,0,0)',
+            withAlpha(tone.color, 0.06 + strength * 0.1),
+            'rgba(0,0,0,0)',
+          ]}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+
+const RAIN_FONT = 13;
+const RAIN_LINE = 16;
+/** Characters in one falling tail. */
+const RAIN_TRAIL = 14;
+/** Glyphs that read as data rather than as language. */
+const RAIN_CHARS = '01<>[]{}/\\|=+*#$%&?!';
+
+const RAIN_STEP: Record<WaveSpeed, number> = {
+  still: 0,
+  slow: 0.05,
+  medium: 0.14,
+  fast: 0.3,
+};
+
+/**
+ * Falling columns, drawn in three passes rather than per character.
+ *
+ * A tail is bright at the head and fades behind it, which would normally mean
+ * one text node per character — several thousand of them. Instead each column
+ * is sorted into three depth bands and the whole screen is drawn three times,
+ * once per band, at three opacities. Three text nodes for the fade, and the
+ * eye reads the steps as a gradient at this size.
+ */
+function Rain({ tone, speed }: { tone: Tone; speed: WaveSpeed }) {
+  const { width, height } = useWindowDimensions();
+  const [frame, setFrame] = useState(0);
+
+  const step = RAIN_STEP[speed];
+
+  useEffect(() => {
+    if (step === 0) return;
+    const timer = setInterval(() => setFrame((n) => n + 1), WAVE_FRAME_MS);
+    return () => clearInterval(timer);
+  }, [step]);
+
+  const columns = Math.floor(width / (RAIN_FONT * MONO_ASPECT));
+  const rows = Math.ceil(height / RAIN_LINE);
+
+  // Per column: how fast it falls and where it started. Seeded, so a column
+  // keeps its character across renders instead of reshuffling every frame.
+  const streams = useMemo(
+    () =>
+      Array.from({ length: columns }, (_, column) => ({
+        rate: 0.45 + noise(column * 31 + 3) * 1.1,
+        offset: noise(column * 57 + 11) * (rows + RAIN_TRAIL),
+      })),
+    [columns, rows],
+  );
+
+  const layers = useMemo(() => {
+    const head: string[] = [];
+    const near: string[] = [];
+    const far: string[] = [];
+    const span = rows + RAIN_TRAIL;
+    const drift = frame * step;
+
+    for (let row = 0; row < rows; row += 1) {
+      let headLine = '';
+      let nearLine = '';
+      let farLine = '';
+
+      for (let column = 0; column < columns; column += 1) {
+        const stream = streams[column];
+        const position = (stream.offset + drift * stream.rate) % span;
+        const behind = position - row;
+
+        if (behind < 0 || behind >= RAIN_TRAIL) {
+          headLine += ' ';
+          nearLine += ' ';
+          farLine += ' ';
+          continue;
+        }
+
+        const index = Math.floor(
+          noise(row * 733 + column * 29 + 5) * RAIN_CHARS.length,
+        );
+        const character = RAIN_CHARS[index];
+
+        headLine += behind < 1 ? character : ' ';
+        nearLine += behind >= 1 && behind < RAIN_TRAIL * 0.35 ? character : ' ';
+        farLine += behind >= RAIN_TRAIL * 0.35 ? character : ' ';
+      }
+
+      head.push(headLine);
+      near.push(nearLine);
+      far.push(farLine);
+    }
+
+    return { head, near, far };
+  }, [rows, columns, streams, frame, step]);
+
+  const sheet = {
+    fontFamily: mono,
+    fontSize: RAIN_FONT,
+    lineHeight: RAIN_LINE,
+  } as const;
+
+  return (
+    <View style={[StyleSheet.absoluteFill, styles.clip]} pointerEvents="none">
+      <Text
+        allowFontScaling={false}
+        style={{ ...sheet, color: tone.color, opacity: 0.14 }}
+      >
+        {layers.far.join('\n')}
+      </Text>
+      <Text
+        allowFontScaling={false}
+        style={[
+          StyleSheet.absoluteFill,
+          { ...sheet, color: tone.color, opacity: 0.32 },
+        ]}
+      >
+        {layers.near.join('\n')}
+      </Text>
+      <Text
+        allowFontScaling={false}
+        style={[
+          StyleSheet.absoluteFill,
+          { ...sheet, color: '#FFFFFF', opacity: 0.55 },
+        ]}
+      >
+        {layers.head.join('\n')}
+      </Text>
+    </View>
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 
 /**
@@ -295,6 +650,9 @@ export const Backdrop = memo(function Backdrop({
       {backdrop === 'wave' && (
         <Wave tone={tone} speed={waveSpeed} scale={waveScale} />
       )}
+      {backdrop === 'grid' && <Grid tone={tone} light={light} />}
+      {backdrop === 'scan' && <Scan tone={tone} light={light} />}
+      {backdrop === 'rain' && <Rain tone={tone} speed={waveSpeed} />}
     </View>
   );
 });

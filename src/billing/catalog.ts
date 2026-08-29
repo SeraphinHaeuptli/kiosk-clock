@@ -12,6 +12,7 @@
  */
 
 import type { BackdropId, FaceId } from '@/clock/settings';
+import type { ToneId } from '@/design/palette';
 
 /**
  * The Play Console product ID. Managed product, not a subscription.
@@ -26,17 +27,19 @@ export const FOUNDER_PRODUCT_ID = 'founder_lifetime';
 /** The one entitlement the app knows about. */
 export type Entitlement = 'founder';
 
-/** Faces included in the free app. Everything else needs the pack. */
-const FREE_FACES: readonly FaceId[] = ['ascii', 'digital'];
-
 /**
- * Backdrops included in the free app.
+ * The free app: a plain clock, on plain black, in a plain colour.
  *
- * `void` because a clock with no backdrop must always work, and `wave` because
- * it is the default — a fresh install has to show something worth keeping
- * before it asks for anything.
+ * It is a narrow tier on purpose. Everything the app is actually *for* — the
+ * character art, the fields that move with the day, the phosphor accent — is
+ * styling, and styling is what the pack sells. What is left still tells the
+ * time perfectly well, keeps the screen awake, dims at night, guards against
+ * burn-in and reads what is playing; none of that is gated. Nobody gets a
+ * crippled clock, they get an unstyled one.
  */
-const FREE_BACKDROPS: readonly BackdropId[] = ['void', 'wave'];
+const FREE_FACES: readonly FaceId[] = ['digital'];
+const FREE_BACKDROPS: readonly BackdropId[] = ['void'];
+const FREE_TONES: readonly ToneId[] = ['white', 'amber', 'green'];
 
 export function faceNeedsFounder(id: FaceId): boolean {
   return !FREE_FACES.includes(id);
@@ -44,6 +47,10 @@ export function faceNeedsFounder(id: FaceId): boolean {
 
 export function backdropNeedsFounder(id: BackdropId): boolean {
   return !FREE_BACKDROPS.includes(id);
+}
+
+export function toneNeedsFounder(id: ToneId): boolean {
+  return !FREE_TONES.includes(id);
 }
 
 /**
@@ -57,8 +64,9 @@ export const PLACEHOLDER_PRICE = '€4.99';
 
 /** Shown on the purchase screen, in the order listed. */
 export const FOUNDER_BENEFITS: readonly string[] = [
-  'the stack, analog and words faces',
-  'the horizon, stars and dither backdrops',
+  'seven more faces: ascii, stack, analog, words, flip, matrix and rings',
+  'seven more backdrops: horizon, stars, dither, wave, grid, scan and rain',
+  "claude's accent colour",
   'every face and backdrop added later',
   'no watermark',
 ];

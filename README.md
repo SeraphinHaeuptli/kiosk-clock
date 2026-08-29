@@ -104,29 +104,41 @@ npm run bundle     # real Metro bundle for iOS, Android and web
 
 ## What it does
 
-**Five faces.** ASCII (the time as character art — roughly two and a half
-thousand small glyphs arranged into the digits), Digital, Stack
-(hours over minutes, readable across a room), Analog (a minimal dial), and
-Words ("it is twenty-five past three"). Each is one component that scales from
-a single `size` prop, so the settings picker previews the real face rather than
-a drawing of it.
+**Eight faces.** Digital (plain, and the default), ASCII (the time as
+character art — roughly two and a half thousand small glyphs arranged into the
+digits), Stack (hours over minutes, readable across a room), Analog (a minimal
+dial), Words ("it is twenty-five past three"), Flip (a split-flap board, seam
+and all), Matrix (the same 5x7 table as ASCII, rendered as lit and unlit LEDs)
+and Rings (concentric dot dials — seconds outside, minutes, hours within — so
+the time is a shape before it is a number). Each is one component that scales
+from a single `size` prop, so the settings picker previews the real face rather
+than a drawing of it.
 
 **One ink colour.** White by default, with amber and green — the phosphors —
 and Claude's own `#d97757`. Colour carries no meaning anywhere in the
 interface, so nothing has to be decoded; state is shown with brackets, rules
 and inverse video instead.
 
-**Five backdrops.** `void` is plain black. Three read a single continuous
+**Eight backdrops.** `void` is plain black. Five read a single continuous
 daylight value — 0 at midnight, 1 at midday, on a cosine — so they drift
-rather than switch: `horizon` brightens overhead through the day, `stars` come
-out after dark and are gone by noon, and `dither` thickens its character field
-toward midday and thins to a dusting overnight.
+rather than switch: `horizon` brightens overhead through the day, `stars`
+thicken after dark and thin toward noon, `dither` fills its character field
+toward midday, `grid` is a ground plane running to a vanishing point below the
+clock, and `scan` is a CRT — fixed line structure under a bright roll that
+takes seven seconds to cross the screen.
 
 `wave` is a drifting field of 2D Perlin noise rendered as characters, with its
 own controls: speed (including *still*), noise frequency from fine to coarse,
 and a colour that either follows the clock's tone or overrides it. Speed
 changes how far the field advances per frame rather than how often it redraws,
-so the cost of the animation is flat however fast it looks.
+so the cost of the animation is flat however fast it looks. `rain` shares that
+speed control: falling glyph columns, drawn in three depth passes rather than
+one text node per character.
+
+None of them is allowed to become the subject. Each is measured against a
+plain-black render — peak and mean luminance, and the share of pixels it
+touches — and tuned to sit in the same band as the others. That is how the
+grid got halved and the scanlines got doubled.
 
 **Kiosk behaviours.** Keep-awake, night dimming between 10 PM and 7 AM,
 burn-in protection that drifts the face a few points on a slow cycle, a
@@ -140,12 +152,17 @@ the finger travelled, so a stray tap on the bar cannot slam the volume to
 wherever it landed — the wrong behaviour for a device sitting on a desk. One
 haptic tick per cell crossed, the way a physical volume wheel detents.
 
-**Founder pack.** A one-off purchase that unlocks the stack, analog and words
-faces and the horizon, stars and dither backdrops. Locked options are not
-hidden or disabled — they run in full on the real clock, under a watermark
-that pulses across the whole screen and sits above the night dimming. The
-trade is deliberate: you can judge the thing by using it, and the only cost of
-not paying is having to look at that.
+**Founder pack.** A one-off purchase that unlocks seven of the eight faces,
+seven of the eight backdrops and Claude's accent colour. The free app is a
+plain clock, on plain black, in a plain colour — everything the app is
+actually *for* is styling, and styling is what the pack sells. Nothing
+functional is behind it: keep-awake, night dimming, burn-in protection, the
+landscape lock and the now-playing bar are all free.
+
+Locked options are not hidden or disabled — they run in full on the real
+clock, under a watermark that pulses across the whole screen and sits above
+the night dimming. The trade is deliberate: you can judge the thing by using
+it, and the only cost of not paying is having to look at that.
 
 The store behind it is a port, and the build ships the local stand-in: a
 purchase is written to device storage and no money moves. `src/billing/
@@ -276,7 +293,7 @@ src/
     SettingsContext.tsx State + debounced persistence
     faces/              One component per face, the 5x7 glyph table,
                         and the registry
-    Backdrop.tsx        The four backdrops
+    Backdrop.tsx        The seven drawn backdrops
     KioskScreen.tsx     Composition
   media/
     nowPlayingSource.ts Resolves device vs endpoint per platform

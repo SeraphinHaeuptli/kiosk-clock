@@ -1,7 +1,24 @@
 import { TONES, type ToneId } from '@/design/palette';
 
-export type FaceId = 'ascii' | 'digital' | 'stack' | 'analog' | 'words';
-export type BackdropId = 'void' | 'horizon' | 'stars' | 'dither' | 'wave';
+export type FaceId =
+  | 'ascii'
+  | 'digital'
+  | 'stack'
+  | 'analog'
+  | 'words'
+  | 'flip'
+  | 'matrix'
+  | 'rings';
+
+export type BackdropId =
+  | 'void'
+  | 'horizon'
+  | 'stars'
+  | 'dither'
+  | 'wave'
+  | 'grid'
+  | 'scan'
+  | 'rain';
 
 /** How fast the wave field drifts. 'still' stops the animation entirely. */
 export type WaveSpeed = 'still' | 'slow' | 'medium' | 'fast';
@@ -36,9 +53,11 @@ export interface ClockSettings {
 }
 
 export const DEFAULT_SETTINGS: ClockSettings = {
-  face: 'ascii',
+  // A plain clock on plain black. Everything with a look to it is behind the
+  // founder pack, so the default has to be the one combination that is not.
+  face: 'digital',
   tone: 'white',
-  backdrop: 'wave',
+  backdrop: 'void',
   backdropTone: 'match',
   waveSpeed: 'slow',
   waveScale: 'medium',
@@ -56,13 +75,25 @@ export const DEFAULT_SETTINGS: ClockSettings = {
   nowPlayingEndpoint: '',
 };
 
-const FACES: readonly FaceId[] = ['ascii', 'digital', 'stack', 'analog', 'words'];
+const FACES: readonly FaceId[] = [
+  'ascii',
+  'digital',
+  'stack',
+  'analog',
+  'words',
+  'flip',
+  'matrix',
+  'rings',
+];
 const BACKDROPS: readonly BackdropId[] = [
   'void',
   'horizon',
   'stars',
   'dither',
   'wave',
+  'grid',
+  'scan',
+  'rain',
 ];
 const WAVE_SPEEDS: readonly WaveSpeed[] = ['still', 'slow', 'medium', 'fast'];
 const WAVE_SCALES: readonly WaveScale[] = ['fine', 'medium', 'coarse'];

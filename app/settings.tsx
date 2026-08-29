@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useBilling } from '@/billing/BillingContext';
-import { backdropNeedsFounder } from '@/billing/catalog';
+import { backdropNeedsFounder, toneNeedsFounder } from '@/billing/catalog';
 import { FacePicker } from '@/clock/FacePicker';
 import { useSettings } from '@/clock/SettingsContext';
 import type {
@@ -38,7 +38,13 @@ const BACKDROP_NAMES: readonly Choice<BackdropId>[] = [
   { id: 'stars', name: 'stars' },
   { id: 'dither', name: 'dither' },
   { id: 'wave', name: 'wave' },
+  { id: 'grid', name: 'grid' },
+  { id: 'scan', name: 'scan' },
+  { id: 'rain', name: 'rain' },
 ];
+
+/** Backdrops that animate, and so take the speed control. */
+const ANIMATED: readonly BackdropId[] = ['wave', 'rain'];
 
 const WAVE_SPEEDS: readonly Choice<WaveSpeed>[] = [
   { id: 'still', name: 'still' },
@@ -53,12 +59,7 @@ const WAVE_SCALES: readonly Choice<WaveScale>[] = [
   { id: 'coarse', name: 'coarse' },
 ];
 
-const BACKDROP_TONES: readonly Choice<BackdropTone>[] = [
-  { id: 'match', name: 'match' },
-  ...TONES.map((t) => ({ id: t.id as BackdropTone, name: t.name })),
-];
-
-const TONE_CHOICES: readonly Choice<ToneId>[] = TONES.map((tone) => ({
+const TONE_NAMES: readonly Choice<ToneId>[] = TONES.map((tone) => ({
   id: tone.id,
   name: tone.name,
 }));
@@ -86,7 +87,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const now = useNow('second');
 
-  // Locked backdrops stay pickable — choosing one is how you see it, complete
+  // Locked options stay pickable — choosing one is how you see it, complete
   // with the watermark that comes with not having paid for it.
   const backdrops = useMemo<readonly Choice<BackdropId>[]>(
     () =>
@@ -95,6 +96,25 @@ export default function SettingsScreen() {
         locked: !founder && backdropNeedsFounder(choice.id),
       })),
     [founder],
+  );
+
+  const tones = useMemo<readonly Choice<ToneId>[]>(
+    () =>
+      TONE_NAMES.map((choice) => ({
+        ...choice,
+        locked: !founder && toneNeedsFounder(choice.id),
+      })),
+    [founder],
+  );
+
+  // The same list, plus 'match'. Built from `tones` so the lock marker cannot
+  // drift between the clock's colour and the backdrop's.
+  const backdropTones = useMemo<readonly Choice<BackdropTone>[]>(
+    () => [
+      { id: 'match', name: 'match' },
+      ...tones.map((choice) => ({ ...choice, id: choice.id as BackdropTone })),
+    ],
+    [tones],
   );
 
   // Mirrors the kiosk's own source, so the status line reflects the real
@@ -147,7 +167,7 @@ export default function SettingsScreen() {
 
         <Heading>tone</Heading>
         <ChoiceRow
-          options={TONE_CHOICES}
+          options={tones}
           value={settings.tone}
           onChange={(next) => update({ tone: next })}
           tone={tone}
@@ -161,13 +181,14 @@ export default function SettingsScreen() {
           tone={tone}
         />
         <Text style={styles.note}>
-          horizon, stars and dither shift with the time of day. wave is a
-          perlin noise field with its own controls.
+          horizon, stars, dither, grid and scan shift with the time of day.
+          wave is a perlin noise field and rain is falling glyph columns; both
+          take a speed.
           {!founder && ' starred options need the founder pack.'}
         </Text>
 
         <ChoiceRow
-          options={BACKDROP_TONES}
+          options={backdropTones}
           value={settings.backdropTone}
           onChange={(backdropTone) => update({ backdropTone })}
           tone={tone}
@@ -176,16 +197,20 @@ export default function SettingsScreen() {
           backdrop colour. match follows the clock's tone.
         </Text>
 
-        {settings.backdrop === 'wave' && (
+        {ANIMATED.includes(settings.backdrop) && (
           <>
-            <Heading>wave speed</Heading>
+            <Heading>{settings.backdrop} speed</Heading>
             <ChoiceRow
               options={WAVE_SPEEDS}
               value={settings.waveSpeed}
               onChange={(waveSpeed) => update({ waveSpeed })}
               tone={tone}
             />
+          </>
+        )}
 
+        {settings.backdrop === 'wave' && (
+          <>
             <Heading>wave noise</Heading>
             <ChoiceRow
               options={WAVE_SCALES}

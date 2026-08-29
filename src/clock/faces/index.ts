@@ -4,6 +4,9 @@ import type { FaceId } from '../settings';
 import { AnalogFace } from './AnalogFace';
 import { AsciiFace } from './AsciiFace';
 import { DigitalFace } from './DigitalFace';
+import { FlipFace } from './FlipFace';
+import { MatrixFace } from './MatrixFace';
+import { RingsFace } from './RingsFace';
 import { StackFace } from './StackFace';
 import { WordsFace } from './WordsFace';
 import type { FaceProps } from './types';
@@ -27,16 +30,14 @@ export interface FaceDefinition {
   heightRatio: number;
 }
 
-/** Adding a face means adding one entry here and nothing else. */
+/**
+ * Adding a face means adding one entry here and nothing else.
+ *
+ * The plain digital face leads because it is the default and the one face the
+ * free app has: `faceOf` falls back to the first entry for an id it does not
+ * recognise, and that fallback must never land on something locked.
+ */
 export const FACES: readonly FaceDefinition[] = [
-  {
-    id: 'ascii',
-    name: 'ascii',
-    Component: AsciiFace,
-    previewSize: 38,
-    widthRatio: 2.95,
-    heightRatio: 1.15,
-  },
   {
     id: 'digital',
     name: 'digital',
@@ -44,6 +45,14 @@ export const FACES: readonly FaceDefinition[] = [
     previewSize: 26,
     widthRatio: 3.5,
     heightRatio: 1.2,
+  },
+  {
+    id: 'ascii',
+    name: 'ascii',
+    Component: AsciiFace,
+    previewSize: 38,
+    widthRatio: 2.95,
+    heightRatio: 1.15,
   },
   {
     id: 'stack',
@@ -68,6 +77,30 @@ export const FACES: readonly FaceDefinition[] = [
     previewSize: 22,
     widthRatio: 2.6,
     heightRatio: 1.85,
+  },
+  {
+    id: 'flip',
+    name: 'flip',
+    Component: FlipFace,
+    previewSize: 32,
+    widthRatio: 4.0,
+    heightRatio: 1.3,
+  },
+  {
+    id: 'matrix',
+    name: 'matrix',
+    Component: MatrixFace,
+    previewSize: 30,
+    widthRatio: 4.0,
+    heightRatio: 1.45,
+  },
+  {
+    id: 'rings',
+    name: 'rings',
+    Component: RingsFace,
+    previewSize: 26,
+    widthRatio: 3.0,
+    heightRatio: 3.0,
   },
 ];
 

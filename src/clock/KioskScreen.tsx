@@ -19,7 +19,11 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useBilling } from '@/billing/BillingContext';
-import { backdropNeedsFounder, faceNeedsFounder } from '@/billing/catalog';
+import {
+  backdropNeedsFounder,
+  faceNeedsFounder,
+  toneNeedsFounder,
+} from '@/billing/catalog';
 import { Watermark } from '@/billing/Watermark';
 import { daylight } from '@/core/daylight';
 import { longDate } from '@/core/format';
@@ -193,10 +197,16 @@ export function KioskScreen() {
    * would flash the watermark across a paying customer's clock on every cold
    * start.
    */
-  const watermarked =
-    billing.ready &&
-    !billing.founder &&
-    (faceNeedsFounder(settings.face) || backdropNeedsFounder(settings.backdrop));
+  const usesLockedContent =
+    faceNeedsFounder(settings.face) ||
+    backdropNeedsFounder(settings.backdrop) ||
+    toneNeedsFounder(settings.tone) ||
+    // 'match' is not a colour of its own — it defers to the clock's tone,
+    // which the line above already covers.
+    (settings.backdropTone !== 'match' &&
+      toneNeedsFounder(settings.backdropTone));
+
+  const watermarked = billing.ready && !billing.founder && usesLockedContent;
 
   const face = faceOf(settings.face);
   const dateAllowance = settings.showDate ? DATE_ALLOWANCE : 0;
