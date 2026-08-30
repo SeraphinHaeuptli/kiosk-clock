@@ -37,8 +37,8 @@
   },
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
     "bundle": "expo export --output-dir .expo-bundle",
     "web": "expo start --web",

@@ -26,11 +26,22 @@ const STORE_PASSWORD = 'KIOSK_UPLOAD_STORE_PASSWORD';
 const KEY_ALIAS = 'KIOSK_UPLOAD_KEY_ALIAS';
 const KEY_PASSWORD = 'KIOSK_UPLOAD_KEY_PASSWORD';
 
+/**
+ * "Is a key actually configured?"
+ *
+ * `hasProperty` alone is not enough. CI supplies these as environment
+ * variables, and a GitHub Actions expression that evaluates to nothing sets the
+ * variable to an empty string rather than leaving it unset — so Gradle sees the
+ * property as present and `file('')` throws "Cannot convert '' to File" before
+ * a single line is compiled. Emptiness has to count as absence.
+ */
+const HAS_KEY = `(project.hasProperty('${STORE_FILE}') && project.property('${STORE_FILE}') != '')`;
+
 const UPLOAD_CONFIG = `
         upload {
-            // Populated only when CI has supplied the key. Referencing the
-            // properties unconditionally would break every build without them.
-            if (project.hasProperty('${STORE_FILE}')) {
+            // Populated only when a key has actually been supplied. Referencing
+            // the properties unconditionally would break every build without one.
+            if ${HAS_KEY} {
                 storeFile file(project.property('${STORE_FILE}'))
                 storePassword project.property('${STORE_PASSWORD}')
                 keyAlias project.property('${KEY_ALIAS}')
@@ -38,7 +49,7 @@ const UPLOAD_CONFIG = `
             }
         }`;
 
-const RELEASE_SIGNING = `signingConfig project.hasProperty('${STORE_FILE}') ? signingConfigs.upload : signingConfigs.debug`;
+const RELEASE_SIGNING = `signingConfig ${HAS_KEY} ? signingConfigs.upload : signingConfigs.debug`;
 
 function addUploadConfig(contents) {
   if (contents.includes('upload {')) return contents;
