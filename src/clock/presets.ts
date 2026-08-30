@@ -95,7 +95,14 @@ export function usePresets() {
     };
   }, []);
 
-  const write = useCallback((next: Preset[]) => {
+  /**
+   * Both writers compute the next list from the current state and then set it,
+   * rather than saving from inside a setState updater. An updater has to be a
+   * pure function of the previous state — React is free to call it twice, and
+   * does in development — so a storage write in there is a write that happens
+   * an unpredictable number of times.
+   */
+  const commit = useCallback((next: Preset[]) => {
     setPresets(next);
     slot.save(next);
   }, []);
@@ -103,42 +110,34 @@ export function usePresets() {
   const save = useCallback(
     (name: string, settings: ClockSettings) => {
       const clean = name.trim().slice(0, NAME_LIMIT) || 'untitled';
+      const look = lookOf(settings);
 
-      setPresets((current) => {
-        const look = lookOf(settings);
-        // Saving over a name that already exists replaces it rather than
-        // making a second entry you then have to tell apart.
-        const existing = current.findIndex(
-          (preset) => preset.name.toLowerCase() === clean.toLowerCase(),
-        );
+      // Saving over a name that already exists replaces it rather than making
+      // a second entry you then have to tell apart.
+      const existing = presets.findIndex(
+        (preset) => preset.name.toLowerCase() === clean.toLowerCase(),
+      );
 
-        const next =
-          existing >= 0
-            ? current.map((preset, index) =>
-                index === existing ? { ...preset, look } : preset,
-              )
-            : [
-                ...current,
-                { id: `${Date.now().toString(36)}`, name: clean, look },
-              ].slice(-MAX_PRESETS);
-
-        slot.save(next);
-        return next;
-      });
+      commit(
+        existing >= 0
+          ? presets.map((preset, index) =>
+              index === existing ? { ...preset, look } : preset,
+            )
+          : [
+              ...presets,
+              { id: Date.now().toString(36), name: clean, look },
+            ].slice(-MAX_PRESETS),
+      );
     },
-    [],
+    [presets, commit],
   );
 
   const remove = useCallback(
     (id: string) => {
-      setPresets((current) => {
-        const next = current.filter((preset) => preset.id !== id);
-        slot.save(next);
-        return next;
-      });
+      commit(presets.filter((preset) => preset.id !== id));
     },
-    [],
+    [presets, commit],
   );
 
-  return { presets, ready, save, remove, write };
+  return { presets, ready, save, remove };
 }

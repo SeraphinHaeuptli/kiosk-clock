@@ -10,6 +10,19 @@ import { readDeviceNowPlaying } from '../../modules/now-playing';
 
 const REQUEST_TIMEOUT_MS = 6_000;
 
+/**
+ * Caps on what a configured endpoint is allowed to hand back.
+ *
+ * The URL is typed by the user and can point anywhere, so the response is
+ * untrusted input even though the user chose the source. `response.json()`
+ * buffers the whole body before parsing, which means a hostile or simply
+ * broken endpoint answering with a gigabyte takes the clock down with it —
+ * the one line of a track name is worth a few kilobytes at the very most.
+ */
+const MAX_RESPONSE_BYTES = 64 * 1024;
+/** A track name longer than this is not a track name. */
+const MAX_FIELD_LENGTH = 300;
+
 export interface Track {
   title: string;
   artist: string | null;
@@ -33,7 +46,9 @@ type Json = Record<string, unknown>;
 
 function text(value: unknown): string | null {
   if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
+  // Truncated, not rejected: a long title should be clipped on screen, which
+  // is what the bar does anyway, rather than blanking the whole readout.
+  const trimmed = value.trim().slice(0, MAX_FIELD_LENGTH);
   return trimmed.length > 0 ? trimmed : null;
 }
 
@@ -98,9 +113,17 @@ export async function loadNowPlaying(
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
+      // Read as text and measure before parsing. Checking Content-Length alone
+      // would not do: it is set by the same server being distrusted, and is
+      // absent entirely on a chunked response.
+      const body = await response.text();
+      if (body.length > MAX_RESPONSE_BYTES) {
+        throw new Error('response too large');
+      }
+
       // A source with nothing playing is a valid answer, not a failure.
       return {
-        track: decodeTrack(await response.json()),
+        track: decodeTrack(JSON.parse(body)),
         mode: 'live',
         from: 'endpoint',
       };

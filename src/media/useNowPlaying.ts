@@ -21,9 +21,23 @@ const ENV_ENDPOINT = (
   process.env.EXPO_PUBLIC_NOW_PLAYING_ENDPOINT ?? ''
 ).trim();
 
+/**
+ * Only http(s) is a source.
+ *
+ * Anything else that reaches `fetch` is at best a confusing failure and at
+ * worst a way to point the app at something local. In practice cleartext http
+ * is refused by the platform too — the app targets API 36, where it is off by
+ * default — so this is really an https allowlist with a clearer error for the
+ * person typing it.
+ */
+function isFetchable(url: string): boolean {
+  return /^https?:\/\//i.test(url);
+}
+
 /** Settings win over the build-time default, which wins over no source. */
 export function resolveNowPlayingEndpoint(configured: string): string {
-  return configured.trim() || ENV_ENDPOINT;
+  const chosen = configured.trim() || ENV_ENDPOINT;
+  return isFetchable(chosen) ? chosen : '';
 }
 
 export function useNowPlaying(endpoint: string, enabled: boolean) {

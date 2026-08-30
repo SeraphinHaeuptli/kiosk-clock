@@ -179,6 +179,10 @@ export function useWeather(query: string, enabled: boolean) {
   useEffect(() => {
     if (!enabled || !place) return;
 
+    // The reading on screen belongs to the place it was fetched for. Leaving
+    // it up while a new one loads put the old city's temperature under the new
+    // city's name — briefly, and wrongly. A blank corner is the honest state.
+    setWeather(null);
     refresh();
     const timer = setInterval(refresh, REFRESH_MS);
     const subscription = AppState.addEventListener('change', (state) => {

@@ -75,18 +75,24 @@ export function KioskScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
+  /**
+   * Two clocks, because which face is shown decides how fast the other has to
+   * tick and shuffle decides which face is shown.
+   *
+   * The shuffle resolves off a minute clock — its shortest period is a quarter
+   * hour, so a minute is exact — and the display clock's rate is then chosen
+   * from the face that came out. Reading the rate off `settings.face` instead
+   * was wrong the moment shuffle could deal an analog face the settings had
+   * never selected: its second hand jumped once a minute.
+   */
+  const minute = useNow('minute');
+  const look = lookFor(settings, minute);
+
   // Only pay for a per-second re-render when something actually moves each
   // second: the seconds readout, or the analog hands.
   const now = useNow(
-    settings.showSeconds || settings.face === 'analog' ? 'second' : 'minute',
+    settings.showSeconds || look.face === 'analog' ? 'second' : 'minute',
   );
-
-  /**
-   * What is actually on screen. Equal to the stored settings unless shuffle is
-   * running, in which case it is derived from the clock — see shuffle.ts for
-   * why it is never written back.
-   */
-  const look = lookFor(settings, now);
 
   // ClockFace is memoised and reads the face off the settings object, so it
   // needs one carrying the shuffled face — rebuilt only when that changes,

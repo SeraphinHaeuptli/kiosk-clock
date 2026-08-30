@@ -358,6 +358,49 @@ bar still moves and reads the level, but nothing is driven, and it says
 Every call into the module is guarded, so its absence degrades the control
 instead of crashing the clock behind it.
 
+## Security posture
+
+What this app can reach, and what it deliberately cannot.
+
+**Permissions.** `INTERNET` and `VIBRATE`, and that is all. Expo's template
+ships `SYSTEM_ALERT_WINDOW` and the two external-storage permissions under a
+comment reading "OPTIONAL PERMISSIONS, REMOVE WHATEVER YOU DO NOT NEED";
+nothing here needs them, and draw-over-other-apps in particular is the
+permission overlay attacks are built on and one Google Play scrutinises. They
+are stripped in `app.json` via `blockedPermissions`.
+
+**Notification access** is the one powerful grant, and the service that holds
+it overrides no callbacks: it exists to be enabled, not to listen. No
+notification is ever delivered to it, let alone read or stored. The track name
+comes from `MediaSessionManager`, which hands back typed `MediaMetadata` —
+title, artist, playing — and nothing else leaves the device.
+
+**Backups are off.** `allowBackup="false"`, so settings and presets are not
+copied to Google Drive and restored onto another device. This app has no
+account and no server; its state should not travel without being asked to.
+
+**The configured now-playing endpoint is untrusted input**, even though the
+user typed it. Only `http(s)` URLs are fetched at all, the body is read as text
+and rejected over 64 KB before parsing — `response.json()` would otherwise
+buffer whatever a hostile or broken server sent — and decoded fields are
+truncated. Cleartext `http` is separately refused by the platform at API 36.
+
+**Nothing is evaluated.** No `eval`, no `dangerouslySetInnerHTML`, no
+`WebView`, no dynamic imports of remote code, and OTA updates are disabled, so
+there is no channel through which code could arrive after install.
+
+**No secrets ship.** The two weather services need no API key, which is most of
+why they were chosen: a key inside an APK is a key anyone can read back out.
+
+Two things are known and unfixed, both documented where they live:
+
+- The entitlement check is client-side, so a determined device owner can grant
+  themselves the founder pack. For a cosmetic unlock that is the right trade;
+  `playBilling.ts` says what server-side verification would take.
+- Release APKs from CI are signed with the debug keystore. That is fine for
+  sideloading a build to your own phone and unfit for anything else — the key
+  is public, so it guarantees nothing about who produced the file.
+
 ## Layout
 
 ```
