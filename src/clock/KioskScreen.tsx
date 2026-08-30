@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Platform,
@@ -19,11 +19,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useBilling } from '@/billing/BillingContext';
-import {
-  backdropNeedsFounder,
-  faceNeedsFounder,
-  toneNeedsFounder,
-} from '@/billing/catalog';
+import { usesFounderContent } from '@/billing/catalog';
 import { Watermark } from '@/billing/Watermark';
 import { daylight } from '@/core/daylight';
 import { longDate } from '@/core/format';
@@ -45,6 +41,7 @@ import { BurnInGuard } from './BurnInGuard';
 import { ClockFace } from './ClockFace';
 import { faceOf } from './faces';
 import { useSettings } from './SettingsContext';
+import { lookFor } from './shuffle';
 import { isNight } from './settings';
 
 const KEEP_AWAKE_TAG = 'kiosk-clock';
@@ -80,6 +77,21 @@ export function KioskScreen() {
   // second: the seconds readout, or the analog hands.
   const now = useNow(
     settings.showSeconds || settings.face === 'analog' ? 'second' : 'minute',
+  );
+
+  /**
+   * What is actually on screen. Equal to the stored settings unless shuffle is
+   * running, in which case it is derived from the clock — see shuffle.ts for
+   * why it is never written back.
+   */
+  const look = lookFor(settings, now);
+
+  // ClockFace is memoised and reads the face off the settings object, so it
+  // needs one carrying the shuffled face — rebuilt only when that changes,
+  // not on every tick.
+  const faceSettings = useMemo(
+    () => (look.face === settings.face ? settings : { ...settings, face: look.face }),
+    [settings, look.face],
   );
 
   const nowPlaying = useNowPlaying(
@@ -210,18 +222,10 @@ export function KioskScreen() {
    * would flash the watermark across a paying customer's clock on every cold
    * start.
    */
-  const usesLockedContent =
-    faceNeedsFounder(settings.face) ||
-    backdropNeedsFounder(settings.backdrop) ||
-    toneNeedsFounder(settings.tone) ||
-    // 'match' is not a colour of its own — it defers to the clock's tone,
-    // which the line above already covers.
-    (settings.backdropTone !== 'match' &&
-      toneNeedsFounder(settings.backdropTone));
+  const watermarked =
+    billing.ready && !billing.founder && usesFounderContent(settings, look);
 
-  const watermarked = billing.ready && !billing.founder && usesLockedContent;
-
-  const face = faceOf(settings.face);
+  const face = faceOf(look.face);
   const dateAllowance = settings.showDate ? DATE_ALLOWANCE : 0;
   const faceSize = Math.max(
     MIN_FACE_SIZE,
@@ -239,13 +243,13 @@ export function KioskScreen() {
 
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: dim }]}>
         <Backdrop
-          backdrop={settings.backdrop}
+          backdrop={look.backdrop}
           // Resolved here rather than inside the backdrop, so the backdrop
           // never needs to know the clock's own tone exists.
           tone={
             settings.backdropTone === 'match'
               ? tone
-              : toneOf(settings.backdropTone)
+              : toneOf(settings.backdropTone, settings.customHue)
           }
           light={Math.round(daylight(now) * LIGHT_STEPS) / LIGHT_STEPS}
           waveSpeed={settings.waveSpeed}
@@ -323,7 +327,7 @@ export function KioskScreen() {
           <BurnInGuard enabled={settings.burnInGuard} style={styles.faceBlock}>
             <ClockFace
               now={now}
-              settings={settings}
+              settings={faceSettings}
               tone={tone}
               size={faceSize}
             />

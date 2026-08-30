@@ -11,12 +11,16 @@ import { useSettings } from '@/clock/SettingsContext';
 import type {
   BackdropId,
   BackdropTone,
+  ShuffleMode,
+  ShufflePeriod,
   WaveScale,
   WaveSpeed,
 } from '@/clock/settings';
+import { lookFor } from '@/clock/shuffle';
 import { useNow } from '@/core/useNow';
 import { TONES, label, surface, type ToneId } from '@/design/palette';
 import { space, type } from '@/design/tokens';
+import { HueRail } from '@/ui/HueRail';
 import {
   ActionRow,
   CheckRow,
@@ -65,6 +69,18 @@ const TONE_NAMES: readonly Choice<ToneId>[] = TONES.map((tone) => ({
   id: tone.id,
   name: tone.name,
 }));
+
+const SHUFFLE_MODES: readonly Choice<ShuffleMode>[] = [
+  { id: 'off', name: 'off' },
+  { id: 'backdrops', name: 'backdrops' },
+  { id: 'everything', name: 'everything' },
+];
+
+const SHUFFLE_PERIODS: readonly Choice<ShufflePeriod>[] = [
+  { id: 'quarter', name: 'quarter hour' },
+  { id: 'hour', name: 'hour' },
+  { id: 'day', name: 'day' },
+];
 
 const UNITS: readonly Choice<TemperatureUnit>[] = [
   { id: 'celsius', name: 'celsius' },
@@ -126,6 +142,19 @@ export default function SettingsScreen() {
       })),
     [founder],
   );
+
+  const shuffleModes = useMemo<readonly Choice<ShuffleMode>[]>(
+    () =>
+      SHUFFLE_MODES.map((choice) => ({
+        ...choice,
+        locked: !founder && choice.id !== 'off',
+      })),
+    [founder],
+  );
+
+  // What the kiosk behind this modal is showing this minute, so the shuffle
+  // section reports the real thing rather than only what was picked.
+  const shown = lookFor(settings, now);
 
   const tones = useMemo<readonly Choice<ToneId>[]>(
     () =>
@@ -205,6 +234,14 @@ export default function SettingsScreen() {
           onChange={(next) => update({ tone: next })}
           tone={tone}
         />
+        {/* Shown whenever the custom tone is in play, from either end: the
+            clock's own colour or the backdrop's override. */}
+        {(settings.tone === 'custom' || settings.backdropTone === 'custom') && (
+          <HueRail
+            hue={settings.customHue}
+            onChange={(customHue) => update({ customHue })}
+          />
+        )}
 
         <Heading>backdrop</Heading>
         <ChoiceRow
@@ -256,6 +293,32 @@ export default function SettingsScreen() {
             </Text>
           </>
         )}
+
+        <Heading>shuffle</Heading>
+        <ChoiceRow
+          options={shuffleModes}
+          value={settings.shuffle}
+          onChange={(shuffle) => update({ shuffle })}
+          tone={tone}
+        />
+        {settings.shuffle !== 'off' && (
+          <>
+            <ChoiceRow
+              options={SHUFFLE_PERIODS}
+              value={settings.shufflePeriod}
+              onChange={(shufflePeriod) => update({ shufflePeriod })}
+              tone={tone}
+            />
+            <StatusRow
+              title="showing now"
+              value={`${shown.face} on ${shown.backdrop}`}
+            />
+          </>
+        )}
+        <Text style={styles.note}>
+          rotates the look on a timer. what you picked above is kept — turn
+          shuffle off and the clock goes straight back to it.
+        </Text>
 
         <Heading>display</Heading>
         <CheckRow
@@ -320,6 +383,7 @@ export default function SettingsScreen() {
           checked={settings.showWeather}
           onChange={(showWeather) => update({ showWeather })}
           tone={tone}
+          locked={!founder}
         />
         <TextRow
           title="location"

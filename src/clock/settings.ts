@@ -1,4 +1,4 @@
-import { TONES, type ToneId } from '@/design/palette';
+import { DEFAULT_HUE, TONES, type ToneId } from '@/design/palette';
 import type { TemperatureUnit } from '@/weather/weather';
 
 export type FaceId =
@@ -28,6 +28,11 @@ export type WaveScale = 'fine' | 'medium' | 'coarse';
 /** 'match' follows the clock's own tone; anything else overrides it. */
 export type BackdropTone = 'match' | ToneId;
 
+/** What the shuffle is allowed to change, if anything. */
+export type ShuffleMode = 'off' | 'backdrops' | 'everything';
+/** How long a shuffled look holds before the next one. */
+export type ShufflePeriod = 'quarter' | 'hour' | 'day';
+
 export interface ClockSettings {
   face: FaceId;
   tone: ToneId;
@@ -53,6 +58,19 @@ export interface ClockSettings {
   nowPlayingEndpoint: string;
 
   /** Weather in the top corners. Silent until a place is set. */
+  /**
+   * Rotate the look on a timer.
+   *
+   * This never writes back to `face` or `backdrop`: the shown look is derived
+   * from these two fields and the clock, so turning shuffle off returns you to
+   * exactly what you picked rather than to wherever the rotation stopped.
+   */
+  shuffle: ShuffleMode;
+  shufflePeriod: ShufflePeriod;
+
+  /** Hue in degrees for the 'custom' tone. Ignored by the other four. */
+  customHue: number;
+
   showWeather: boolean;
   /** Free text, geocoded once: "zurich", "10 Downing Street", "Kyoto". */
   weatherPlace: string;
@@ -81,12 +99,17 @@ export const DEFAULT_SETTINGS: ClockSettings = {
 
   nowPlayingEndpoint: '',
 
+  shuffle: 'off',
+  shufflePeriod: 'hour',
+  customHue: DEFAULT_HUE,
+
   showWeather: true,
   weatherPlace: '',
   weatherUnit: 'celsius',
 };
 
-const FACES: readonly FaceId[] = [
+/** Exported so the shuffle can pick from them without importing components. */
+export const FACE_IDS: readonly FaceId[] = [
   'ascii',
   'digital',
   'stack',
@@ -96,7 +119,7 @@ const FACES: readonly FaceId[] = [
   'matrix',
   'rings',
 ];
-const BACKDROPS: readonly BackdropId[] = [
+export const BACKDROP_IDS: readonly BackdropId[] = [
   'void',
   'horizon',
   'stars',
@@ -108,6 +131,14 @@ const BACKDROPS: readonly BackdropId[] = [
 ];
 const WAVE_SPEEDS: readonly WaveSpeed[] = ['still', 'slow', 'medium', 'fast'];
 const TEMPERATURE_UNITS: readonly TemperatureUnit[] = ['celsius', 'fahrenheit'];
+const SHUFFLE_MODES: readonly ShuffleMode[] = ['off', 'backdrops', 'everything'];
+const SHUFFLE_PERIODS: readonly ShufflePeriod[] = ['quarter', 'hour', 'day'];
+
+/** Wraps rather than clamps: a hue is a circle, and 400 degrees is 40. */
+function hue(value: unknown, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+  return ((Math.round(value) % 360) + 360) % 360;
+}
 const WAVE_SCALES: readonly WaveScale[] = ['fine', 'medium', 'coarse'];
 
 function oneOf<T extends string>(
@@ -133,13 +164,13 @@ export function decodeSettings(raw: unknown): ClockSettings {
   const input = raw as Partial<Record<keyof ClockSettings, unknown>>;
 
   return {
-    face: oneOf(FACES, input.face, DEFAULT_SETTINGS.face),
+    face: oneOf(FACE_IDS, input.face, DEFAULT_SETTINGS.face),
     tone: oneOf(
       TONES.map((t) => t.id),
       input.tone,
       DEFAULT_SETTINGS.tone,
     ) as ToneId,
-    backdrop: oneOf(BACKDROPS, input.backdrop, DEFAULT_SETTINGS.backdrop),
+    backdrop: oneOf(BACKDROP_IDS, input.backdrop, DEFAULT_SETTINGS.backdrop),
     backdropTone: oneOf(
       ['match', ...TONES.map((t) => t.id)] as const,
       input.backdropTone,
@@ -162,6 +193,14 @@ export function decodeSettings(raw: unknown): ClockSettings {
       typeof input.nowPlayingEndpoint === 'string'
         ? input.nowPlayingEndpoint.trim()
         : DEFAULT_SETTINGS.nowPlayingEndpoint,
+
+    shuffle: oneOf(SHUFFLE_MODES, input.shuffle, DEFAULT_SETTINGS.shuffle),
+    shufflePeriod: oneOf(
+      SHUFFLE_PERIODS,
+      input.shufflePeriod,
+      DEFAULT_SETTINGS.shufflePeriod,
+    ),
+    customHue: hue(input.customHue, DEFAULT_SETTINGS.customHue),
 
     showWeather: bool(input.showWeather, DEFAULT_SETTINGS.showWeather),
     weatherPlace:

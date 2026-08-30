@@ -23,12 +23,15 @@ export function CheckRow({
   checked,
   onChange,
   tone,
+  locked,
 }: {
   title: string;
   hint?: string;
   checked: boolean;
   onChange: (next: boolean) => void;
   tone: Tone;
+  /** Same asterisk as ChoiceRow: paid, but still yours to switch on and try. */
+  locked?: boolean;
 }) {
   return (
     <Pressable
@@ -45,7 +48,7 @@ export function CheckRow({
         {checked ? '[x]' : '[ ]'}
       </Text>
       <View style={styles.rowText}>
-        <Text style={styles.rowTitle}>{title}</Text>
+        <Text style={styles.rowTitle}>{locked ? `${title}*` : title}</Text>
         {hint && <Text style={styles.rowHint}>{hint}</Text>}
       </View>
     </Pressable>
@@ -221,7 +224,12 @@ const styles = StyleSheet.create({
   rowText: { flexShrink: 1 },
   rowTitle: { ...type.body, color: label.primary },
   rowHint: { ...type.tiny, color: label.tertiary, marginTop: 2 },
-  box: { ...type.body, color: label.tertiary },
+  /**
+   * Never shrinks. An unchecked box is "[ ]", and that space is a legal line
+   * break: squeezed by a long hint beside it, flexbox was wrapping the box
+   * onto two lines as "[" over "]".
+   */
+  box: { ...type.body, color: label.tertiary, flexShrink: 0 },
   choices: {
     flexDirection: 'row',
     flexWrap: 'wrap',

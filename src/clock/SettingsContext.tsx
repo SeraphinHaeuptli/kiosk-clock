@@ -79,7 +79,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const value = useMemo<SettingsValue>(
     () => ({
       settings,
-      tone: toneOf(settings.tone),
+      tone: toneOf(settings.tone, settings.customHue),
       ready,
       update,
       reset,

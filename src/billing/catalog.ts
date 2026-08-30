@@ -11,7 +11,7 @@
  * paid?".
  */
 
-import type { BackdropId, FaceId } from '@/clock/settings';
+import type { BackdropId, ClockSettings, FaceId } from '@/clock/settings';
 import type { ToneId } from '@/design/palette';
 
 /**
@@ -54,6 +54,37 @@ export function toneNeedsFounder(id: ToneId): boolean {
 }
 
 /**
+ * Whether the clock as currently configured is drawing on the pack.
+ *
+ * One function, used by the watermark and by nothing else, because the answer
+ * has to be the same everywhere: it was three separate conditions in
+ * KioskScreen before the pack grew features as well as content, and a fourth
+ * would eventually have been added in one place and forgotten in another.
+ *
+ * `face` and `backdrop` are passed in rather than read off `settings`, because
+ * with shuffle running the look on screen is derived and is the thing being
+ * marked — not what the settings happen to say.
+ */
+export function usesFounderContent(
+  settings: ClockSettings,
+  shown: { face: FaceId; backdrop: BackdropId },
+): boolean {
+  return (
+    faceNeedsFounder(shown.face) ||
+    backdropNeedsFounder(shown.backdrop) ||
+    toneNeedsFounder(settings.tone) ||
+    // 'match' is not a colour of its own; it defers to the clock's tone, which
+    // the line above already covers.
+    (settings.backdropTone !== 'match' &&
+      toneNeedsFounder(settings.backdropTone)) ||
+    settings.shuffle !== 'off' ||
+    // Weather is only using the pack once it is actually asking for somewhere.
+    // The switch being on with no location set draws nothing and costs nothing.
+    (settings.showWeather && settings.weatherPlace.trim() !== '')
+  );
+}
+
+/**
  * Display price used before the store has answered — and the only price the
  * test port has. The real one is whatever Google Play reports for the buyer's
  * country, which is the only figure that may be shown next to a buy button:
@@ -66,7 +97,9 @@ export const PLACEHOLDER_PRICE = '€4.99';
 export const FOUNDER_BENEFITS: readonly string[] = [
   'seven more faces: ascii, stack, analog, words, flip, matrix and rings',
   'seven more backdrops: horizon, stars, dither, wave, grid, scan and rain',
-  "claude's accent colour",
-  'every face and backdrop added later',
+  "claude's accent colour, and one you mix yourself from any hue",
+  'shuffle: a new look every quarter hour, hour or day',
+  'weather in the corners for anywhere you name',
+  'every face, backdrop and feature added later',
   'no watermark',
 ];

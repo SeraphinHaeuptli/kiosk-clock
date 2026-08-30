@@ -115,7 +115,10 @@ from a single `size` prop, so the settings picker previews the real face rather
 than a drawing of it.
 
 **One ink colour.** White by default, with amber and green — the phosphors —
-and Claude's own `#d97757`. Colour carries no meaning anywhere in the
+Claude's own `#d97757`, and a fifth you mix yourself off a hue rail. Only the
+hue is yours: saturation and lightness are fixed where the built-in phosphors
+sit, so every choice lands as legible as they are. A free HSL picker would let
+someone choose 8% lightness and conclude the app was broken. Colour carries no meaning anywhere in the
 interface, so nothing has to be decoded; state is shown with brackets, rules
 and inverse video instead.
 
@@ -146,6 +149,13 @@ landscape lock for a dock or stand, and both system bars — status and
 navigation — hidden while the clock is up, re-asserted on every rotation.
 Tap anywhere for the settings button; it fades out again after four seconds.
 
+**Shuffle.** A new look every quarter hour, hour or day — backdrops alone, or
+faces too. It never writes back to your settings: the look on screen is
+*derived* from what you picked plus the clock, so turning shuffle off returns
+you to exactly the clock you set up rather than to wherever the rotation
+stopped. It also needs no timer, since the kiosk already re-renders each
+minute.
+
 **Weather in the corners.** Temperature and conditions top left, the place
 and the rest of the day's range top right, for whatever location you type into
 settings. The right corner and the settings button share their corner: touch
@@ -160,12 +170,17 @@ the finger travelled, so a stray tap on the bar cannot slam the volume to
 wherever it landed — the wrong behaviour for a device sitting on a desk. One
 haptic tick per cell crossed, the way a physical volume wheel detents.
 
-**Founder pack.** A one-off purchase that unlocks seven of the eight faces,
-seven of the eight backdrops and Claude's accent colour. The free app is a
-plain clock, on plain black, in a plain colour — everything the app is
-actually *for* is styling, and styling is what the pack sells. Nothing
-functional is behind it: keep-awake, night dimming, burn-in protection, the
-landscape lock and the now-playing bar are all free.
+**Founder pack.** A one-off purchase covering seven of the eight faces, seven
+of the eight backdrops, Claude's accent colour and the custom hue, shuffle,
+and the weather corners. The free app is a plain clock, on plain black, in a
+plain colour. Keep-awake, night dimming, burn-in protection, the landscape
+lock and the now-playing bar stay free — the clock still works, it is just
+unstyled.
+
+One function answers "is this configuration using the pack?", for the
+watermark and for nothing else. It was three conditions spread through the
+kiosk screen before the pack grew features as well as content, and a fourth
+would eventually have been added in one place and forgotten in another.
 
 Locked options are not hidden or disabled — they run in full on the real
 clock, under a watermark that pulses across the whole screen and sits above
@@ -333,6 +348,7 @@ src/
     faces/              One component per face, the 5x7 glyph table,
                         and the registry
     Backdrop.tsx        The seven drawn backdrops
+    shuffle.ts          The shown look, derived from settings + the clock
     KioskScreen.tsx     Composition
   media/
     nowPlayingSource.ts Resolves device vs endpoint per platform
@@ -356,6 +372,7 @@ src/
     useWeather.ts       Cached place resolution, forecast on a timer
     WeatherCorners.tsx  The two corner readouts
   ui/Terminal.tsx       Headings, checks, choices, fields
+  ui/HueRail.tsx        The one control in the app that uses colour
 
 modules/now-playing/    Local Android module: a NotificationListenerService
                         that holds the grant, and MediaSessionManager reads
@@ -385,6 +402,9 @@ exists.
 - No hardcoded colours outside `src/design/palette.ts`.
 - Backdrops receive a quantised `light` value rather than the current time, so
   the memo holds and they redraw a few times an hour instead of once a second.
+- Shuffle is derived, never persisted. Anything that rotates what is shown
+  reads through `lookFor` rather than writing to `settings`, so the user's own
+  choice is never overwritten by a feature they might switch off later.
 - What the founder pack gates lives in `src/billing/catalog.ts` and nowhere
   else. The face registry and the settings screen ask it; they do not carry
   their own flags.
