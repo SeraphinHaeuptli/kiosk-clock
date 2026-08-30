@@ -161,6 +161,64 @@ export function StatusRow({ title, value }: { title: string; value: string }) {
   );
 }
 
+/**
+ * `title        [-] value [+]`
+ *
+ * For the values a list of options cannot carry: an hour of the day is
+ * twenty-four choices, a UTC offset is over a hundred. Stepping keeps them on
+ * one row, and the value between the two controls stays on the character grid
+ * like everything else.
+ */
+export function StepRow({
+  title,
+  value,
+  onStep,
+  tone,
+  locked,
+}: {
+  title: string;
+  value: string;
+  onStep: (delta: number) => void;
+  tone: Tone;
+  locked?: boolean;
+}) {
+  return (
+    <View style={styles.stepRow}>
+      <Text style={styles.rowTitle}>{locked ? `${title}*` : title}</Text>
+
+      <View style={styles.stepper}>
+        <Pressable
+          onPress={() => onStep(-1)}
+          hitSlop={space.md}
+          accessibilityRole="button"
+          accessibilityLabel={`decrease ${title}`}
+          style={({ pressed }) => pressed && styles.pressed}
+        >
+          <Text style={[styles.step, { color: tone.color }]}>[-]</Text>
+        </Pressable>
+
+        <Text
+          style={styles.stepValue}
+          allowFontScaling={false}
+          numberOfLines={1}
+        >
+          {value}
+        </Text>
+
+        <Pressable
+          onPress={() => onStep(1)}
+          hitSlop={space.md}
+          accessibilityRole="button"
+          accessibilityLabel={`increase ${title}`}
+          style={({ pressed }) => pressed && styles.pressed}
+        >
+          <Text style={[styles.step, { color: tone.color }]}>[+]</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 export function ActionRow({
   title,
   onPress,
@@ -217,7 +275,12 @@ const styles = StyleSheet.create({
   row: {
     minHeight: ROW_HEIGHT,
     flexDirection: 'row',
-    alignItems: 'center',
+    // Top-aligned rather than centred, with padding standing in for the
+    // centring on single-line rows. A row whose hint wraps to two lines was
+    // dropping its box to the vertical middle, where it read as belonging to
+    // the hint rather than to the title above it.
+    alignItems: 'flex-start',
+    paddingVertical: 9,
     gap: space.md,
   },
   pressed: { opacity: 0.5 },
@@ -255,4 +318,19 @@ const styles = StyleSheet.create({
     gap: space.xs,
   },
   statusValue: { ...type.small, color: label.secondary },
+  stepRow: {
+    minHeight: ROW_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.md,
+  },
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  step: { ...type.body },
+  stepValue: {
+    ...type.body,
+    color: label.primary,
+    minWidth: 76,
+    textAlign: 'center',
+  },
 });

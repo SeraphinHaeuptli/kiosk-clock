@@ -143,11 +143,29 @@ plain-black render — peak and mean luminance, and the share of pixels it
 touches — and tuned to sit in the same band as the others. That is how the
 grid got halved and the scanlines got doubled.
 
-**Kiosk behaviours.** Keep-awake, night dimming between 10 PM and 7 AM,
-burn-in protection that drifts the face a few points on a slow cycle, a
-landscape lock for a dock or stand, and both system bars — status and
+**Kiosk behaviours.** Keep-awake, night dimming on your own hours and to your
+own depth, burn-in protection that drifts the face a few points on a slow
+cycle, a landscape lock for a dock or stand, and both system bars — status and
 navigation — hidden while the clock is up, re-asserted on every rotation.
 Tap anywhere for the settings button; it fades out again after four seconds.
+
+**Presets.** Name a look — "bedside", "desk", "dock" — and come back to it. A
+preset holds the look and nothing else: the night schedule, the weather
+location and the rest belong to where the device lives rather than to how it
+looks, and restoring "bedside" should not silently move your weather to
+another city.
+
+**A line under the date.** Up to three small readouts share it: a second time
+zone, a countdown to a date, and the battery. Each is a few characters and
+none is the reason anyone looks at the clock, so they sit together as a
+footnote to the date rather than being scattered into corners. Anything not
+switched on is simply absent — the row shrinks rather than leaving gaps.
+
+The second clock takes a fixed UTC offset rather than a named zone. That never
+needs a timezone database, which on React Native is not reliably present, and
+never disagrees with itself — but it does not follow anyone's daylight saving,
+so a city that observes it needs moving twice a year. The trade is stated in
+settings rather than hidden.
 
 **Shuffle.** A new look every quarter hour, hour or day — backdrops alone, or
 faces too. It never writes back to your settings: the look on screen is
@@ -172,7 +190,18 @@ haptic tick per cell crossed, the way a physical volume wheel detents.
 
 **Founder pack.** A one-off purchase covering seven of the eight faces, seven
 of the eight backdrops, Claude's accent colour and the custom hue, shuffle,
-and the weather corners. The free app is a plain clock, on plain black, in a
+the weather corners and their detail, a night schedule on your own hours, the
+second clock, the countdown and the battery.
+
+Night dimming itself stays free. It worked before the pack existed, and taking
+a working feature away from people who already had it is not something a paid
+tier should do — what the pack sells is choosing the hours and the depth, so
+the gate tests whether any of the three has been moved off its default.
+
+Presets are gated transitively rather than directly: a preset of a paid look
+watermarks when applied, because the look does, and a preset of the free look
+costs nothing. Gating the act of saving would mean the watermark had to know
+about a store the kiosk never loads. The free app is a plain clock, on plain black, in a
 plain colour. Keep-awake, night dimming, burn-in protection, the landscape
 lock and the now-playing bar stay free — the clock still works, it is just
 unstyled.
@@ -349,6 +378,9 @@ src/
                         and the registry
     Backdrop.tsx        The seven drawn backdrops
     shuffle.ts          The shown look, derived from settings + the clock
+    extras.ts           Second clock, countdown and battery line — all pure
+    presets.ts          Saved looks, validated back through decodeSettings
+    InfoLine.tsx        The row those three share, under the date
     KioskScreen.tsx     Composition
   media/
     nowPlayingSource.ts Resolves device vs endpoint per platform
@@ -371,7 +403,8 @@ src/
     source.ts           MET Norway and Nominatim, and the terms they carry
     useWeather.ts       Cached place resolution, forecast on a timer
     WeatherCorners.tsx  The two corner readouts
-  ui/Terminal.tsx       Headings, checks, choices, fields
+  power/useBattery.ts   Guarded adapter over expo-battery
+  ui/Terminal.tsx       Headings, checks, choices, fields, steppers
   ui/HueRail.tsx        The one control in the app that uses colour
 
 modules/now-playing/    Local Android module: a NotificationListenerService
@@ -391,6 +424,13 @@ exists.
   size, the digital face barely one — and the screen sizes each from the box it
   measured rather than from a single screen-derived guess. Getting this wrong
   is what made the tall faces overflow in landscape.
+- No `Intl`. Dates, times and the world clock are formatted by hand so output
+  is identical on every engine — `Intl.DateTimeFormat` with a named time zone
+  depends on an ICU database whose presence varies by build.
+- Day arithmetic collapses both ends to local midnight and rounds. A day that
+  crosses a daylight-saving boundary is twenty-three or twenty-five hours long,
+  and dividing raw milliseconds would put a countdown off by one for half the
+  year in every country that changes its clocks.
 - Every decoder over a third-party payload is total: it takes `unknown`,
   returns null on anything it does not recognise, and never throws. The
   weather services are other people's, and a clock is not allowed to crash

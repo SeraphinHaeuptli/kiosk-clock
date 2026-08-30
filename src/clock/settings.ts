@@ -50,6 +50,11 @@ export interface ClockSettings {
   keepAwake: boolean;
   /** Fade the face down overnight instead of glaring in a dark room. */
   nightDim: boolean;
+  /** The window, in local hours. `from` after `to` wraps past midnight. */
+  nightFrom: number;
+  nightTo: number;
+  /** How much brightness survives the night, 0 to 1. */
+  nightLevel: number;
   /** Drift the face a few pixels to spare OLED panels on long runs. */
   burnInGuard: boolean;
   landscape: boolean;
@@ -75,6 +80,21 @@ export interface ClockSettings {
   /** Free text, geocoded once: "zurich", "10 Downing Street", "Kyoto". */
   weatherPlace: string;
   weatherUnit: TemperatureUnit;
+  /** Wind, rain and tomorrow, from the same forecast already fetched. */
+  weatherDetail: boolean;
+
+  /** A second time, at a fixed offset from UTC. */
+  showSecondClock: boolean;
+  /** Minutes from UTC. Fixed, so it does not follow anyone's daylight saving. */
+  secondClockOffset: number;
+  secondClockLabel: string;
+
+  /** Days to or since a date, as `YYYY-MM-DD`. Empty means nothing to count. */
+  countdownDate: string;
+  countdownLabel: string;
+
+  /** Charge level under the clock, for a phone left on a dock. */
+  showBattery: boolean;
 }
 
 export const DEFAULT_SETTINGS: ClockSettings = {
@@ -94,6 +114,9 @@ export const DEFAULT_SETTINGS: ClockSettings = {
 
   keepAwake: true,
   nightDim: true,
+  nightFrom: 22,
+  nightTo: 7,
+  nightLevel: 0.45,
   burnInGuard: true,
   landscape: false,
 
@@ -106,6 +129,16 @@ export const DEFAULT_SETTINGS: ClockSettings = {
   showWeather: true,
   weatherPlace: '',
   weatherUnit: 'celsius',
+  weatherDetail: false,
+
+  showSecondClock: false,
+  secondClockOffset: 0,
+  secondClockLabel: '',
+
+  countdownDate: '',
+  countdownLabel: '',
+
+  showBattery: false,
 };
 
 /** Exported so the shuffle can pick from them without importing components. */
@@ -139,6 +172,33 @@ function hue(value: unknown, fallback: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
   return ((Math.round(value) % 360) + 360) % 360;
 }
+
+/** A finite number pinned to a range. Anything else falls back. */
+function ranged(
+  value: unknown,
+  fallback: number,
+  low: number,
+  high: number,
+  round: (n: number) => number = Math.round,
+): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+  return Math.min(high, Math.max(low, round(value)));
+}
+
+/** Bare `YYYY-MM-DD`, or empty. Anything else is not a date this app wrote. */
+function isoDate(value: unknown, fallback: string): string {
+  if (typeof value !== 'string') return fallback;
+  const trimmed = value.trim();
+  if (trimmed === '') return '';
+  return /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : fallback;
+}
+
+function text(value: unknown, fallback: string, limit: number): string {
+  return typeof value === 'string' ? value.trim().slice(0, limit) : fallback;
+}
+
+/** Room for "melbourne" or "mum", not for an essay on the clock face. */
+const LABEL_LIMIT = 24;
 const WAVE_SCALES: readonly WaveScale[] = ['fine', 'medium', 'coarse'];
 
 function oneOf<T extends string>(
@@ -186,6 +246,17 @@ export function decodeSettings(raw: unknown): ClockSettings {
 
     keepAwake: bool(input.keepAwake, DEFAULT_SETTINGS.keepAwake),
     nightDim: bool(input.nightDim, DEFAULT_SETTINGS.nightDim),
+    nightFrom: ranged(input.nightFrom, DEFAULT_SETTINGS.nightFrom, 0, 23),
+    nightTo: ranged(input.nightTo, DEFAULT_SETTINGS.nightTo, 0, 23),
+    // Floored at a tenth rather than zero: a night level of nothing is a black
+    // screen, which reads as a broken clock rather than as a dim one.
+    nightLevel: ranged(
+      input.nightLevel,
+      DEFAULT_SETTINGS.nightLevel,
+      0.1,
+      1,
+      (n) => Math.round(n * 20) / 20,
+    ),
     burnInGuard: bool(input.burnInGuard, DEFAULT_SETTINGS.burnInGuard),
     landscape: bool(input.landscape, DEFAULT_SETTINGS.landscape),
 
@@ -212,13 +283,49 @@ export function decodeSettings(raw: unknown): ClockSettings {
       input.weatherUnit,
       DEFAULT_SETTINGS.weatherUnit,
     ),
+    weatherDetail: bool(input.weatherDetail, DEFAULT_SETTINGS.weatherDetail),
+
+    showSecondClock: bool(
+      input.showSecondClock,
+      DEFAULT_SETTINGS.showSecondClock,
+    ),
+    // UTC-12 to UTC+14, the real span of world offsets, on the quarter hour
+    // because Nepal, the Chatham Islands and a few others are not on the hour.
+    secondClockOffset: ranged(
+      input.secondClockOffset,
+      DEFAULT_SETTINGS.secondClockOffset,
+      -720,
+      840,
+      (n) => Math.round(n / 15) * 15,
+    ),
+    secondClockLabel: text(
+      input.secondClockLabel,
+      DEFAULT_SETTINGS.secondClockLabel,
+      LABEL_LIMIT,
+    ),
+
+    countdownDate: isoDate(input.countdownDate, DEFAULT_SETTINGS.countdownDate),
+    countdownLabel: text(
+      input.countdownLabel,
+      DEFAULT_SETTINGS.countdownLabel,
+      LABEL_LIMIT,
+    ),
+
+    showBattery: bool(input.showBattery, DEFAULT_SETTINGS.showBattery),
   };
 }
 
-const NIGHT_STARTS_AT = 22;
-const NIGHT_ENDS_AT = 7;
-
-export function isNight(date: Date): boolean {
+/**
+ * Whether the given moment falls inside the night window.
+ *
+ * `from` after `to` wraps past midnight, which is the ordinary case — a night
+ * that starts at ten and ends at seven. Equal ends mean an empty window rather
+ * than a whole day: someone who sets both to the same hour has expressed no
+ * range, and reading that as "always dim" would black out the clock for a
+ * setting that looks like it does nothing.
+ */
+export function isNight(date: Date, from: number, to: number): boolean {
   const hour = date.getHours();
-  return hour >= NIGHT_STARTS_AT || hour < NIGHT_ENDS_AT;
+  if (from === to) return false;
+  return from < to ? hour >= from && hour < to : hour >= from || hour < to;
 }

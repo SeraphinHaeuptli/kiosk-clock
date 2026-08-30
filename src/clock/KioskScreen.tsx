@@ -33,12 +33,15 @@ import {
   useNowPlaying,
 } from '@/media/useNowPlaying';
 import { useVolume } from '@/media/useVolume';
+import { useBattery } from '@/power/useBattery';
 import { WeatherNow, WeatherPlace } from '@/weather/WeatherCorners';
 import { useWeather } from '@/weather/useWeather';
 
 import { Backdrop } from './Backdrop';
 import { BurnInGuard } from './BurnInGuard';
 import { ClockFace } from './ClockFace';
+import { InfoLine } from './InfoLine';
+import { batteryLine, countdownLine, offsetClock, offsetName } from './extras';
 import { faceOf } from './faces';
 import { useSettings } from './SettingsContext';
 import { lookFor } from './shuffle';
@@ -46,7 +49,6 @@ import { isNight } from './settings';
 
 const KEEP_AWAKE_TAG = 'kiosk-clock';
 const CHROME_TIMEOUT_MS = 4_000;
-const NIGHT_OPACITY = 0.45;
 /**
  * The face scales with the display, but the audio bar is a fixed-density
  * readout: stretched across a landscape phone or a desktop it strands the
@@ -100,6 +102,7 @@ export function KioskScreen() {
   );
   const volume = useVolume(settings.showMedia);
   const weather = useWeather(settings.weatherPlace, settings.showWeather);
+  const battery = useBattery(settings.showBattery);
 
   /* -- Kiosk behaviours ---------------------------------------------------- */
 
@@ -148,15 +151,16 @@ export function KioskScreen() {
   /* -- Night dimming ------------------------------------------------------- */
 
   const dim = useRef(new Animated.Value(1)).current;
-  const shouldDim = settings.nightDim && isNight(now);
+  const shouldDim =
+    settings.nightDim && isNight(now, settings.nightFrom, settings.nightTo);
 
   useEffect(() => {
     Animated.timing(dim, {
-      toValue: shouldDim ? NIGHT_OPACITY : 1,
+      toValue: shouldDim ? settings.nightLevel : 1,
       duration: duration.slow,
       useNativeDriver: true,
     }).start();
-  }, [dim, shouldDim]);
+  }, [dim, shouldDim, settings.nightLevel]);
 
   /* -- Tap-to-reveal chrome ------------------------------------------------ */
 
@@ -283,6 +287,7 @@ export function KioskScreen() {
             <WeatherNow
               weather={weather.weather}
               unit={settings.weatherUnit}
+              detail={settings.weatherDetail}
               tone={tone}
             />
           </Animated.View>
@@ -296,6 +301,7 @@ export function KioskScreen() {
                 weather={weather.weather}
                 place={weather.place?.label ?? ''}
                 unit={settings.weatherUnit}
+                detail={settings.weatherDetail}
               />
             </Animated.View>
 
@@ -336,6 +342,22 @@ export function KioskScreen() {
                 {longDate(now)}
               </Text>
             )}
+
+            <InfoLine
+              items={[
+                settings.showSecondClock
+                  ? `${settings.secondClockLabel.trim() || offsetName(settings.secondClockOffset)} ${offsetClock(now, settings.secondClockOffset, settings.hour12)}`
+                  : null,
+                countdownLine(
+                  settings.countdownDate,
+                  settings.countdownLabel,
+                  now,
+                ),
+                battery.level === null
+                  ? null
+                  : batteryLine(battery.level, battery.charging),
+              ]}
+            />
           </BurnInGuard>
         </Animated.View>
 

@@ -11,6 +11,7 @@
  * paid?".
  */
 
+import { DEFAULT_SETTINGS } from '@/clock/settings';
 import type { BackdropId, ClockSettings, FaceId } from '@/clock/settings';
 import type { ToneId } from '@/design/palette';
 
@@ -80,7 +81,30 @@ export function usesFounderContent(
     settings.shuffle !== 'off' ||
     // Weather is only using the pack once it is actually asking for somewhere.
     // The switch being on with no location set draws nothing and costs nothing.
-    (settings.showWeather && settings.weatherPlace.trim() !== '')
+    (settings.showWeather && settings.weatherPlace.trim() !== '') ||
+    settings.showSecondClock ||
+    settings.showBattery ||
+    // A date that parses. A half-typed one is not a countdown yet.
+    settings.countdownDate.trim() !== '' ||
+    usesCustomNight(settings)
+  );
+}
+
+/**
+ * Whether the night window has been moved off its defaults.
+ *
+ * Night dimming itself stays free — it was free before the pack existed, and
+ * taking a working feature away from people who already had it is not
+ * something a paid tier should do. What the pack sells is choosing the hours
+ * and the depth, so the test is whether any of the three differs from what the
+ * app has always done.
+ */
+function usesCustomNight(settings: ClockSettings): boolean {
+  return (
+    settings.nightDim &&
+    (settings.nightFrom !== DEFAULT_SETTINGS.nightFrom ||
+      settings.nightTo !== DEFAULT_SETTINGS.nightTo ||
+      settings.nightLevel !== DEFAULT_SETTINGS.nightLevel)
   );
 }
 
@@ -99,7 +123,9 @@ export const FOUNDER_BENEFITS: readonly string[] = [
   'seven more backdrops: horizon, stars, dither, wave, grid, scan and rain',
   "claude's accent colour, and one you mix yourself from any hue",
   'shuffle: a new look every quarter hour, hour or day',
-  'weather in the corners for anywhere you name',
+  'weather in the corners for anywhere you name, with wind and tomorrow',
+  'a night schedule on your hours, at your brightness',
+  'a second time zone, a countdown, and the battery',
   'every face, backdrop and feature added later',
   'no watermark',
 ];

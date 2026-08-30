@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
@@ -17,6 +17,9 @@ import type {
   WaveSpeed,
 } from '@/clock/settings';
 import { lookFor } from '@/clock/shuffle';
+import { usePresets, MAX_PRESETS, type Preset } from '@/clock/presets';
+import { countdownLine, offsetName } from '@/clock/extras';
+import { pad2 } from '@/core/format';
 import { useNow } from '@/core/useNow';
 import { TONES, label, surface, type ToneId } from '@/design/palette';
 import { space, type } from '@/design/tokens';
@@ -27,6 +30,7 @@ import {
   ChoiceRow,
   Heading,
   StatusRow,
+  StepRow,
   TextRow,
   type Choice,
 } from '@/ui/Terminal';
@@ -102,6 +106,52 @@ const AUDIO_HINT =
   'url returning {"title":"...","artist":"...","playing":true}, such as a ' +
   'playerctl or mpris wrapper on the machine doing the playing.';
 
+/** "22:00" from a bare hour. */
+function hourLabel(hour: number): string {
+  return `${pad2(hour)}:00`;
+}
+
+/** A row that applies its look on the name, and deletes on the cross. */
+function PresetRow({
+  preset,
+  tone,
+  onApply,
+  onRemove,
+}: {
+  preset: Preset;
+  tone: ReturnType<typeof useSettings>['tone'];
+  onApply: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <View style={styles.presetRow}>
+      <Pressable
+        onPress={onApply}
+        accessibilityRole="button"
+        accessibilityLabel={`apply ${preset.name}`}
+        style={({ pressed }) => [styles.presetName, pressed && styles.pressed]}
+      >
+        <Text style={styles.presetText} numberOfLines={1}>
+          {`> ${preset.name}`}
+        </Text>
+        <Text style={styles.presetHint} numberOfLines={1}>
+          {`${preset.look.face} · ${preset.look.backdrop} · ${preset.look.tone}`}
+        </Text>
+      </Pressable>
+
+      <Pressable
+        onPress={onRemove}
+        hitSlop={space.md}
+        accessibilityRole="button"
+        accessibilityLabel={`delete ${preset.name}`}
+        style={({ pressed }) => pressed && styles.pressed}
+      >
+        <Text style={[styles.presetDelete, { color: tone.dim }]}>[x]</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function weatherStatus(status: WeatherStatus, place: string | null): string {
   switch (status.kind) {
     case 'off':
@@ -131,6 +181,8 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const now = useNow('second');
+  const { presets, save: savePreset, remove: removePreset } = usePresets();
+  const [presetName, setPresetName] = useState('');
 
   // Locked options stay pickable — choosing one is how you see it, complete
   // with the watermark that comes with not having paid for it.
@@ -294,6 +346,44 @@ export default function SettingsScreen() {
           </>
         )}
 
+        <Heading>presets</Heading>
+        {presets.map((preset) => (
+          <PresetRow
+            key={preset.id}
+            preset={preset}
+            tone={tone}
+            onApply={() => update(preset.look)}
+            onRemove={() => removePreset(preset.id)}
+          />
+        ))}
+        {presets.length < MAX_PRESETS ? (
+          <>
+            <TextRow
+              title="save this look as"
+              value={presetName}
+              placeholder="bedside"
+              onChangeText={setPresetName}
+              kind="text"
+            />
+            <ActionRow
+              title="save"
+              onPress={() => {
+                savePreset(presetName, settings);
+                setPresetName('');
+              }}
+            />
+          </>
+        ) : (
+          <Text style={styles.note}>
+            {`${MAX_PRESETS} saved, which is the limit. delete one to make room.`}
+          </Text>
+        )}
+        <Text style={styles.note}>
+          a preset holds the look — face, colour, backdrop — and nothing else.
+          the night schedule, the weather location and the rest belong to the
+          device rather than to the look.
+        </Text>
+
         <Heading>shuffle</Heading>
         <ChoiceRow
           options={shuffleModes}
@@ -346,6 +436,14 @@ export default function SettingsScreen() {
           onChange={(showMedia) => update({ showMedia })}
           tone={tone}
         />
+        <CheckRow
+          title="battery"
+          hint="charge level under the date, for a phone left on a dock"
+          checked={settings.showBattery}
+          onChange={(showBattery) => update({ showBattery })}
+          tone={tone}
+          locked={!founder}
+        />
 
         <Heading>kiosk</Heading>
         <CheckRow
@@ -356,11 +454,47 @@ export default function SettingsScreen() {
         />
         <CheckRow
           title="night dimming"
-          hint="fades the display between 10pm and 7am"
+          hint="fades the display through the hours you set"
           checked={settings.nightDim}
           onChange={(nightDim) => update({ nightDim })}
           tone={tone}
         />
+        {settings.nightDim && (
+          <>
+            <StepRow
+              title="from"
+              value={hourLabel(settings.nightFrom)}
+              onStep={(step) =>
+                update({ nightFrom: (settings.nightFrom + step + 24) % 24 })
+              }
+              tone={tone}
+              locked={!founder}
+            />
+            <StepRow
+              title="until"
+              value={hourLabel(settings.nightTo)}
+              onStep={(step) =>
+                update({ nightTo: (settings.nightTo + step + 24) % 24 })
+              }
+              tone={tone}
+              locked={!founder}
+            />
+            <StepRow
+              title="brightness"
+              value={`${Math.round(settings.nightLevel * 100)}%`}
+              onStep={(step) =>
+                update({
+                  nightLevel: Math.min(
+                    1,
+                    Math.max(0.1, settings.nightLevel + step * 0.05),
+                  ),
+                })
+              }
+              tone={tone}
+              locked={!founder}
+            />
+          </>
+        )}
         <CheckRow
           title="burn-in protection"
           hint="drifts the clock a few points on a slow cycle"
@@ -398,11 +532,85 @@ export default function SettingsScreen() {
           onChange={(weatherUnit) => update({ weatherUnit })}
           tone={tone}
         />
+        <CheckRow
+          title="detail"
+          hint="wind, rain and tomorrow, from the forecast already fetched"
+          checked={settings.weatherDetail}
+          onChange={(weatherDetail) => update({ weatherDetail })}
+          tone={tone}
+          locked={!founder}
+        />
         <StatusRow
           title="source"
           value={weatherStatus(weather.status, weather.place?.label ?? null)}
         />
         <Text style={styles.note}>{WEATHER_HINT}</Text>
+
+        <Heading>second clock</Heading>
+        <CheckRow
+          title="second time"
+          hint="another zone on the line under the date"
+          checked={settings.showSecondClock}
+          onChange={(showSecondClock) => update({ showSecondClock })}
+          tone={tone}
+          locked={!founder}
+        />
+        {settings.showSecondClock && (
+          <>
+            <TextRow
+              title="label"
+              value={settings.secondClockLabel}
+              placeholder="nyc"
+              onChangeText={(secondClockLabel) => update({ secondClockLabel })}
+              kind="text"
+            />
+            <StepRow
+              title="offset"
+              value={offsetName(settings.secondClockOffset)}
+              onStep={(step) =>
+                update({
+                  secondClockOffset: Math.min(
+                    840,
+                    Math.max(-720, settings.secondClockOffset + step * 15),
+                  ),
+                })
+              }
+              tone={tone}
+            />
+          </>
+        )}
+        <Text style={styles.note}>
+          a fixed offset from utc, in quarter hours. fixed rather than a named
+          zone, so it never depends on a timezone database that may not be in
+          the build — but it does not follow anyone's daylight saving, so a
+          city that observes it needs moving twice a year.
+        </Text>
+
+        <Heading>countdown</Heading>
+        <TextRow
+          title={founder ? 'date' : 'date*'}
+          value={settings.countdownDate}
+          placeholder="2026-12-25"
+          onChangeText={(countdownDate) => update({ countdownDate })}
+          kind="text"
+        />
+        <TextRow
+          title="label"
+          value={settings.countdownLabel}
+          placeholder="christmas"
+          onChangeText={(countdownLabel) => update({ countdownLabel })}
+          kind="text"
+        />
+        <StatusRow
+          title="shows"
+          value={
+            countdownLine(
+              settings.countdownDate,
+              settings.countdownLabel,
+              now,
+            ) ?? (settings.countdownDate ? 'not a date' : 'nothing')
+          }
+        />
 
         <Heading>now playing</Heading>
         <TextRow
@@ -459,6 +667,17 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.5 },
   scroll: { flex: 1 },
   content: { paddingHorizontal: space.lg },
+  presetRow: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.md,
+  },
+  presetName: { flexShrink: 1 },
+  presetText: { ...type.body, color: label.primary },
+  presetHint: { ...type.tiny, color: label.tertiary, marginTop: 2 },
+  presetDelete: { ...type.body },
   note: {
     ...type.tiny,
     color: label.tertiary,

@@ -5,7 +5,9 @@ import { mono, numerals, space, type } from '@/design/tokens';
 
 import {
   conditionWord,
+  formatRain,
   formatTemperature,
+  formatWind,
   type TemperatureUnit,
   type Weather,
 } from './weather';
@@ -30,14 +32,26 @@ const TEMPERATURE_SIZE = 24;
 export function WeatherNow({
   weather,
   unit,
+  detail,
   tone,
 }: {
   weather: Weather | null;
   unit: TemperatureUnit;
+  detail: boolean;
   tone: Tone;
 }) {
   if (!weather) return null;
-  const word = conditionWord(weather.condition);
+
+  // Rain is dropped when there is none rather than printed as zero, so the
+  // second line appears because something is happening.
+  const caption = [
+    conditionWord(weather.condition),
+    ...(detail
+      ? [formatWind(weather.wind, unit), formatRain(weather.rain)]
+      : []),
+  ]
+    .filter(Boolean)
+    .join('  ·  ');
 
   return (
     <View style={styles.left}>
@@ -47,9 +61,9 @@ export function WeatherNow({
       >
         {formatTemperature(weather.temperature, unit)}
       </Text>
-      {word !== '' && (
+      {caption !== '' && (
         <Text allowFontScaling={false} style={styles.caption}>
-          {word}
+          {caption}
         </Text>
       )}
     </View>
@@ -61,10 +75,12 @@ export function WeatherPlace({
   weather,
   place,
   unit,
+  detail,
 }: {
   weather: Weather | null;
   place: string;
   unit: TemperatureUnit;
+  detail: boolean;
 }) {
   if (!weather) return null;
 
@@ -86,6 +102,11 @@ export function WeatherPlace({
       {range && (
         <Text allowFontScaling={false} style={styles.range}>
           {range}
+        </Text>
+      )}
+      {detail && weather.tomorrow && (
+        <Text allowFontScaling={false} style={styles.range}>
+          {`tmw ${formatTemperature(weather.tomorrow.low, unit)} ${formatTemperature(weather.tomorrow.high, unit)}`}
         </Text>
       )}
     </View>

@@ -21,6 +21,12 @@ export type Condition =
   | 'storm'
   | 'unknown';
 
+export interface DayRange {
+  condition: Condition;
+  high: number | null;
+  low: number | null;
+}
+
 export interface Weather {
   /** Always celsius, as the source gives it. Converted at the last moment. */
   temperature: number;
@@ -28,6 +34,12 @@ export interface Weather {
   /** The rest of today, where the forecast reaches that far. */
   high: number | null;
   low: number | null;
+  /** Metres per second, as the source gives it. Converted for display. */
+  wind: number | null;
+  /** Millimetres expected over the next six hours. */
+  rain: number | null;
+  /** Null until the forecast reaches tomorrow, which it does by mid-morning. */
+  tomorrow: DayRange | null;
 }
 
 export interface Place {
@@ -119,6 +131,56 @@ function symbolOf(data: Record<string, unknown>): string {
  * `now` is passed in rather than read, so the same fixture decodes the same
  * way in a test as it does at runtime.
  */
+/** Same calendar day in the device's own zone — the clock standing next to it. */
+function sameDay(a: Date, b: Date): boolean {
+  return (
+    a.getDate() === b.getDate() &&
+    a.getMonth() === b.getMonth() &&
+    a.getFullYear() === b.getFullYear()
+  );
+}
+
+/**
+ * Highest, lowest and prevailing condition across one local day.
+ *
+ * The condition is taken from the entry nearest midday rather than the first
+ * of the day: a summary of tomorrow that reports the weather at one in the
+ * morning describes a night nobody is asking about.
+ */
+function rangeOver(series: readonly unknown[], day: Date): DayRange | null {
+  let high: number | null = null;
+  let low: number | null = null;
+  let noonSymbol = '';
+  let noonGap = Infinity;
+
+  for (const entry of series) {
+    const record = asRecord(entry);
+    const time = typeof record?.time === 'string' ? new Date(record.time) : null;
+    if (!time || Number.isNaN(time.getTime()) || !sameDay(time, day)) continue;
+
+    const data = asRecord(record?.data);
+    const value = asNumber(
+      asRecord(asRecord(data?.instant)?.details)?.air_temperature,
+    );
+    if (value !== null) {
+      high = high === null ? value : Math.max(high, value);
+      low = low === null ? value : Math.min(low, value);
+    }
+
+    const gap = Math.abs(time.getHours() - 12);
+    if (data && gap < noonGap) {
+      const symbol = symbolOf(data);
+      if (symbol) {
+        noonSymbol = symbol;
+        noonGap = gap;
+      }
+    }
+  }
+
+  if (high === null && low === null) return null;
+  return { condition: conditionFor(noonSymbol), high, low };
+}
+
 export function decodeForecast(raw: unknown, now: Date): Weather | null {
   const series = asRecord(asRecord(raw)?.properties)?.timeseries;
   if (!Array.isArray(series) || series.length === 0) return null;
@@ -127,39 +189,26 @@ export function decodeForecast(raw: unknown, now: Date): Weather | null {
   const firstData = asRecord(first?.data);
   if (!firstData) return null;
 
-  const temperature = asNumber(
-    asRecord(asRecord(firstData.instant)?.details)?.air_temperature,
-  );
+  const instant = asRecord(asRecord(firstData.instant)?.details);
+  const temperature = asNumber(instant?.air_temperature);
   if (temperature === null) return null;
 
-  // The rest of today, by the device's own calendar day — a forecast is only
-  // useful against the clock standing next to it.
-  let high: number | null = null;
-  let low: number | null = null;
-
-  for (const entry of series) {
-    const record = asRecord(entry);
-    const time = typeof record?.time === 'string' ? new Date(record.time) : null;
-    if (!time || Number.isNaN(time.getTime())) continue;
-    if (time.getDate() !== now.getDate() || time.getMonth() !== now.getMonth()) {
-      continue;
-    }
-
-    const value = asNumber(
-      asRecord(asRecord(asRecord(record?.data)?.instant)?.details)
-        ?.air_temperature,
-    );
-    if (value === null) continue;
-
-    high = high === null ? value : Math.max(high, value);
-    low = low === null ? value : Math.min(low, value);
-  }
+  const today = rangeOver(series, now);
+  const tomorrow = rangeOver(
+    series,
+    new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1),
+  );
 
   return {
     temperature,
     condition: conditionFor(symbolOf(firstData)),
-    high,
-    low,
+    high: today?.high ?? null,
+    low: today?.low ?? null,
+    wind: asNumber(instant?.wind_speed),
+    rain: asNumber(
+      asRecord(asRecord(firstData.next_6_hours)?.details)?.precipitation_amount,
+    ),
+    tomorrow,
   };
 }
 
@@ -198,4 +247,37 @@ export function formatTemperature(
 ): string {
   if (celsius === null) return '--°';
   return `${Math.round(toUnit(celsius, unit))}°`;
+}
+
+/**
+ * Wind in the units that go with the temperature.
+ *
+ * Somebody reading Fahrenheit is not expecting metres per second, so the one
+ * unit choice in settings carries both rather than asking twice for the same
+ * preference.
+ */
+export function formatWind(
+  metresPerSecond: number | null,
+  unit: TemperatureUnit,
+): string | null {
+  if (metresPerSecond === null || !Number.isFinite(metresPerSecond)) return null;
+  return unit === 'fahrenheit'
+    ? `${Math.round(metresPerSecond * 2.23694)} mph`
+    : `${Math.round(metresPerSecond * 3.6)} km/h`;
+}
+
+/**
+ * Rainfall, or nothing at all.
+ *
+ * A dry forecast returns null rather than "0 mm". The line only exists to warn
+ * you, and a readout that spends most of the year announcing no rain trains
+ * the eye to stop reading it.
+ */
+export function formatRain(millimetres: number | null): string | null {
+  if (millimetres === null || !Number.isFinite(millimetres) || millimetres <= 0) {
+    return null;
+  }
+  return millimetres < 1
+    ? `${millimetres.toFixed(1)} mm`
+    : `${Math.round(millimetres)} mm`;
 }
