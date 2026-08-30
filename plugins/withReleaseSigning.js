@@ -49,7 +49,15 @@ const UPLOAD_CONFIG = `
             }
         }`;
 
-const RELEASE_SIGNING = `signingConfig ${HAS_KEY} ? signingConfigs.upload : signingConfigs.debug`;
+/**
+ * Written as an assignment, not as `signingConfig cond ? a : b`.
+ *
+ * Groovy reads a bare method name followed by a parenthesised expression as a
+ * call — so the command form parsed as `signingConfig(cond)` and handed AGP a
+ * Boolean where it wanted a SigningConfig. `=` makes it a property assignment
+ * with no such ambiguity.
+ */
+const RELEASE_SIGNING = `signingConfig = ${HAS_KEY} ? signingConfigs.upload : signingConfigs.debug`;
 
 function addUploadConfig(contents) {
   if (contents.includes('upload {')) return contents;
