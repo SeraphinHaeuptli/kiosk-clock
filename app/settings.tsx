@@ -181,7 +181,12 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const now = useNow('second');
-  const { presets, save: savePreset, remove: removePreset } = usePresets();
+  const {
+    presets,
+    save: savePreset,
+    remove: removePreset,
+    clear: clearPresets,
+  } = usePresets();
   const [presetName, setPresetName] = useState('');
 
   // Locked options stay pickable — choosing one is how you see it, complete
@@ -239,10 +244,21 @@ export default function SettingsScreen() {
   const weather = useWeather(settings.weatherPlace, settings.showWeather);
 
   const confirmReset = () => {
-    Alert.alert('reset all settings?', 'the clock returns to its defaults.', [
+    Alert.alert(
+      'reset all settings?',
+      'the clock returns to its defaults, and saved presets and the remembered weather location are cleared. the founder pack is kept.',
+      [
       { text: 'cancel', style: 'cancel' },
-      { text: 'reset', style: 'destructive', onPress: reset },
-    ]);
+      {
+        text: 'reset',
+        style: 'destructive',
+        onPress: () => {
+          reset();
+          clearPresets();
+        },
+      },
+      ],
+    );
   };
 
   return (

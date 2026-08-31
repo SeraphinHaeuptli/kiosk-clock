@@ -22,16 +22,17 @@ const ENV_ENDPOINT = (
 ).trim();
 
 /**
- * Only http(s) is a source.
+ * https, and nothing else.
  *
- * Anything else that reaches `fetch` is at best a confusing failure and at
- * worst a way to point the app at something local. In practice cleartext http
- * is refused by the platform too — the app targets API 36, where it is off by
- * default — so this is really an https allowlist with a clearer error for the
- * person typing it.
+ * Cleartext http cannot work anyway: the app targets API 36, where Android
+ * refuses it unless the manifest opts back in, and this one does not. Accepting
+ * an http:// URL here only bought a confusing failure several seconds later
+ * instead of an honest empty source immediately — and it made "everything this
+ * app sends is encrypted in transit" a claim that depended on the platform
+ * rather than on the app.
  */
 function isFetchable(url: string): boolean {
-  return /^https?:\/\//i.test(url);
+  return /^https:\/\//i.test(url);
 }
 
 /** Settings win over the build-time default, which wins over no source. */

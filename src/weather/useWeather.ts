@@ -71,6 +71,20 @@ let memo: Cached | null = null;
 let memoLoaded = false;
 const inFlight = new Map<string, Promise<Fetched<Place>>>();
 
+/**
+ * Forget the remembered place, in memory as well as on disk.
+ *
+ * Clearing only storage would leave the previous location live in `memo` for
+ * the rest of the session, so a reset would appear not to have worked until
+ * the app was next launched.
+ */
+export async function clearPlaceCache(): Promise<void> {
+  memo = null;
+  memoLoaded = false;
+  inFlight.clear();
+  await placeSlot.clear();
+}
+
 async function resolvePlace(query: string): Promise<Fetched<Place>> {
   if (!memoLoaded) {
     memo = await placeSlot.load();

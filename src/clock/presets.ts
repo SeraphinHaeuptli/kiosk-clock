@@ -79,6 +79,8 @@ function decodePresets(raw: unknown): Preset[] {
 
 const slot = jsonSlot(asyncStorageAdapter, 'kiosk.presets.v1', decodePresets);
 
+
+
 export function usePresets() {
   const [presets, setPresets] = useState<Preset[]>([]);
   const [ready, setReady] = useState(false);
@@ -139,5 +141,8 @@ export function usePresets() {
     [presets, commit],
   );
 
-  return { presets, ready, save, remove };
+  /** Part of "reset all settings", which has to mean all of them. */
+  const clear = useCallback(() => commit([]), [commit]);
+
+  return { presets, ready, save, remove, clear };
 }

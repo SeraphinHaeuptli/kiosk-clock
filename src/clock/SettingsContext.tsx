@@ -12,6 +12,7 @@ import {
 import { AppState } from 'react-native';
 
 import { asyncStorageAdapter, jsonSlot } from '@/core/storage';
+import { clearPlaceCache } from '@/weather/useWeather';
 import { toneOf, type Tone } from '@/design/palette';
 
 import {
@@ -101,9 +102,19 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [persist],
   );
 
+  /**
+   * Settings, and the remembered weather location that belongs to them.
+   *
+   * The place cache is cleared here because nothing else owns it; saved presets
+   * are cleared by the screen that holds their state, since clearing the store
+   * from under a live list would leave rows on screen that no longer exist.
+   * The founder entitlement is deliberately kept — resetting your preferences
+   * should not look like losing a purchase.
+   */
   const reset = useCallback(() => {
     setSettings(DEFAULT_SETTINGS);
     persist(DEFAULT_SETTINGS);
+    clearPlaceCache();
   }, [persist]);
 
   const value = useMemo<SettingsValue>(
