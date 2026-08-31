@@ -44,6 +44,14 @@ export function HueRail({
   widthRef.current = width;
   const startHue = useRef(hue);
 
+  // The responder has to outlive the renders its own onChange causes. A
+  // PanResponder keeps the gesture's accumulated dx inside the object
+  // create() returns, so rebuilding it mid-drag resets that to zero and the
+  // hue stops following the finger — and the caller's onChange is a fresh
+  // arrow every render. Hold it in a ref and build the responder once.
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
   const swatches = useMemo(
     () =>
       Array.from({ length: CELLS }, (_, index) =>
@@ -67,7 +75,7 @@ export function HueRail({
           startHue.current = wrap(
             (event.nativeEvent.locationX / span) * 360,
           );
-          onChange(startHue.current);
+          onChangeRef.current(startHue.current);
         },
 
         // Relative from there, because a move event's locationX is only
@@ -76,10 +84,12 @@ export function HueRail({
         onPanResponderMove: (_, gesture) => {
           const span = widthRef.current;
           if (span <= 0) return;
-          onChange(wrap(startHue.current + (gesture.dx / span) * 360));
+          onChangeRef.current(
+            wrap(startHue.current + (gesture.dx / span) * 360),
+          );
         },
       }),
-    [onChange],
+    [],
   );
 
   const onLayout = (event: LayoutChangeEvent) => {
@@ -100,7 +110,15 @@ export function HueRail({
         </Text>
       </View>
 
-      <View onLayout={onLayout} {...responder.panHandlers}>
+      {/* box-only: locationX arrives relative to whichever view the finger
+          actually landed on, and without this that is a single swatch a
+          thirty-sixth of the rail wide — so every touch would read as a few
+          degrees from zero, pinning the caret to the left edge. */}
+      <View
+        onLayout={onLayout}
+        pointerEvents="box-only"
+        {...responder.panHandlers}
+      >
         <View style={styles.rail} accessibilityRole="adjustable">
           {swatches.map((color, index) => (
             <View key={index} style={{ flex: 1, backgroundColor: color }} />
