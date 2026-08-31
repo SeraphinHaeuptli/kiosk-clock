@@ -23,6 +23,12 @@ const ROOT = 'android/app/build/intermediates/merged_manifests';
 const ALLOWED = new Map([
   ['android.permission.INTERNET', 'weather and the optional now-playing endpoint'],
   ['android.permission.VIBRATE', 'the haptic tick on the volume bar'],
+  [
+    'com.kioskclock.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION',
+    'AndroidX, targeting API 33+ — a signature permission scoped to this app,' +
+      ' guarding its own dynamically registered receivers. Not user-facing and' +
+      ' not grantable to anything not signed with the same key.',
+  ],
 ]);
 
 /** Things that must be present, not merely permitted. */

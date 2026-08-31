@@ -28,10 +28,12 @@ Two things in the code do not yet match the app being described.
 
 2. **`isFetchable` in `src/media/useNowPlaying.ts` accepts `http://` as well
    as `https://`.** The release manifest does not set
-   `android:usesCleartextTraffic`, and the platform default at the API level
-   this app targets is to refuse cleartext, so such a request fails in
-   practice — but the *code* permits it. Before answering "yes, all data is
-   encrypted in transit" (question 3 below), tighten that regex to
+   `android:usesCleartextTraffic`, and the app targets API 36
+   (`targetSdk = "36"` in React Native 0.86's Gradle version catalog, which
+   Expo's autolinking reads), where the platform default is to refuse
+   cleartext — so such a request fails in practice, but the *code* permits it.
+   Before answering "yes, all data is encrypted in transit" (Q2 below),
+   tighten that regex to
    `/^https:\/\//i`. Then the answer is true of the code as well as of the
    platform, and stays true if the target API level is ever lowered.
 
@@ -233,7 +235,8 @@ Android's precondition for calling
 actually comes from.
 
 Keep this explanation to hand for the review-notes field and for any policy
-appeal. It is checkable in eleven lines of public source.
+appeal. It is checkable in sixteen lines of public source, most of them the
+comment explaining why the class is empty.
 
 ### Audio files → Music files, Other audio files, Voice or sound recordings
 
@@ -353,12 +356,44 @@ and a reviewer reads them together.
 | Health apps | **No** | |
 | Financial features | **No** | Once billing is real: in-app purchase of a digital unlock through Play Billing is not a "financial feature" in the sense this declaration means (loans, investments, insurance, money transfer). If Console's own wording contradicts that, follow Console. |
 | Government apps | **No** | |
+| Advertising ID | **Declare: not used** | No ad SDK, and no dependency should inject `com.google.android.gms.permission.AD_ID`. Verify against the merged manifest of the release bundle rather than trusting this — the declaration is about what actually ships. |
 | Data deletion / account deletion URL | **Not applicable** | No accounts exist. |
 
 One more that is easy to forget: **in the store listing itself**, disclose the
 notification-access feature in plain words. Play expects sensitive permissions
 to be visible before install, not discovered afterwards. The full description
 in `store/copy.md` carries that paragraph — keep it if you edit the copy.
+
+---
+
+## Where this document disagrees with `docs/play-requirements.md`
+
+That file (written separately, in the same folder) reaches a different answer
+on the Location row, and you should not read the two and assume they agree.
+
+| Question | `play-requirements.md` | This document |
+|---|---|---|
+| Approximate location — processed ephemerally? | **Yes, tick it** | **No, do not tick it** |
+| Approximate location — shared? | **Not shared** | **Shared** |
+
+The disagreement is real and neither answer is obviously wrong. The case for
+ticking ephemeral is Google's own worked example, which is almost exactly this
+app: a weather app that sends location off-device to fetch a forecast and
+keeps nothing. The case against, which is why this document says no, is that
+the app *does* keep the resolved coordinates (in `kiosk.weather.place.v1`,
+on-device) and that MET Norway's published terms state the coordinates and IP
+are written to their logs — so "retained for no longer than necessary to
+service the request" is not true of the recipient, and it is checkable that it
+is not true.
+
+Similarly on sharing: `play-requirements.md` is implicitly relying on the
+user-initiated-action exception, which is defensible; this document recommends
+declaring rather than relying on it.
+
+**Decide once, and make the two files agree before you submit.** A reviewer
+comparing your Data safety declaration against your privacy policy is the
+normal failure mode here, and having two internal documents that contradict
+each other is how you end up submitting the wrong one.
 
 ---
 

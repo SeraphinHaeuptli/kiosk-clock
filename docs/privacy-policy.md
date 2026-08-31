@@ -136,8 +136,9 @@ previews, not your one-time codes, not anything else. The service exists only
 to be enabled, because being an enabled listener is the condition Android
 places on `getActiveSessions`.
 
-The whole file is eleven lines including comments. It is in the public
-repository. If you do not want to take this on trust, go and read it.
+The whole file is sixteen lines, most of them the comment explaining why it is
+empty. It is in the public repository. If you do not want to take this on
+trust, go and read it.
 
 **It is entirely optional.** Kiosk never asks for it at startup and cannot turn
 it on for you — only you can, in Android's own settings screen. If you never
