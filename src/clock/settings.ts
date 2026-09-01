@@ -91,6 +91,15 @@ export interface ClockSettings {
   weatherUnit: TemperatureUnit;
   /** Wind, rain and tomorrow, from the same forecast already fetched. */
   weatherDetail: boolean;
+  /**
+   * Which pair of corners the readout sits in.
+   *
+   * Top by default, where it frames the clock without touching it. Bottom for
+   * the phones that punch a front camera through the top-left corner: the
+   * temperature lands exactly under the lens, and there is no padding that
+   * clears it without shoving the face off centre.
+   */
+  weatherPosition: WeatherPosition;
 
   /** A second time, at a fixed offset from UTC. */
   showSecondClock: boolean;
@@ -140,6 +149,7 @@ export const DEFAULT_SETTINGS: ClockSettings = {
   weatherPlace: '',
   weatherUnit: 'celsius',
   weatherDetail: false,
+  weatherPosition: 'top',
 
   showSecondClock: false,
   secondClockOffset: 0,
@@ -174,6 +184,11 @@ export const BACKDROP_IDS: readonly BackdropId[] = [
 ];
 const WAVE_SPEEDS: readonly WaveSpeed[] = ['still', 'slow', 'medium', 'fast'];
 const TEMPERATURE_UNITS: readonly TemperatureUnit[] = ['celsius', 'fahrenheit'];
+
+/** Which edge of the screen the weather readout is pinned to. */
+export type WeatherPosition = 'top' | 'bottom';
+
+const WEATHER_POSITIONS: readonly WeatherPosition[] = ['top', 'bottom'];
 const SHUFFLE_MODES: readonly ShuffleMode[] = ['off', 'backdrops', 'everything'];
 const SHUFFLE_PERIODS: readonly ShufflePeriod[] = ['quarter', 'hour', 'day'];
 
@@ -298,6 +313,11 @@ export function decodeSettings(raw: unknown): ClockSettings {
       DEFAULT_SETTINGS.weatherUnit,
     ),
     weatherDetail: bool(input.weatherDetail, DEFAULT_SETTINGS.weatherDetail),
+    weatherPosition: oneOf(
+      WEATHER_POSITIONS,
+      input.weatherPosition,
+      DEFAULT_SETTINGS.weatherPosition,
+    ),
 
     showSecondClock: bool(
       input.showSecondClock,

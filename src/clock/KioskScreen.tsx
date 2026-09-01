@@ -261,6 +261,31 @@ export function KioskScreen() {
     ),
   );
 
+  /*
+    The two halves of the weather readout, built once and dropped into
+    whichever row the setting asks for. Only one of the two rows ever renders
+    them, so there is no question of the same element being mounted twice.
+  */
+  const atBottom = settings.weatherPosition === 'bottom';
+
+  const nowReadout = (
+    <WeatherNow
+      weather={weather.weather}
+      unit={settings.weatherUnit}
+      detail={settings.weatherDetail}
+      tone={tone}
+    />
+  );
+
+  const placeReadout = (
+    <WeatherPlace
+      weather={weather.weather}
+      place={weather.place?.label ?? ''}
+      unit={settings.weatherUnit}
+      detail={settings.weatherDetail}
+    />
+  );
+
   if (!ready) return <View style={styles.root} />;
 
   return (
@@ -306,12 +331,7 @@ export function KioskScreen() {
           {/* Always rendered, empty or not: it is the left half of the row,
               and without it the right half stops being in the corner. */}
           <Animated.View pointerEvents="none" style={{ opacity: dim }}>
-            <WeatherNow
-              weather={weather.weather}
-              unit={settings.weatherUnit}
-              detail={settings.weatherDetail}
-              tone={tone}
-            />
+            {!atBottom && nowReadout}
           </Animated.View>
 
           <View style={styles.headerRight}>
@@ -319,12 +339,7 @@ export function KioskScreen() {
               pointerEvents="none"
               style={{ opacity: Animated.multiply(dim, chromeOut) }}
             >
-              <WeatherPlace
-                weather={weather.weather}
-                place={weather.place?.label ?? ''}
-                unit={settings.weatherUnit}
-                detail={settings.weatherDetail}
-              />
+              {!atBottom && placeReadout}
             </Animated.View>
 
             <Animated.View
@@ -383,6 +398,29 @@ export function KioskScreen() {
           </BurnInGuard>
         </Animated.View>
 
+        {atBottom && weather.weather !== null && (
+          /*
+            Mirrors the top row rather than reflowing it: temperature left,
+            place right. Moving the readout changes which edge it hugs and
+            nothing else about how it reads.
+
+            The place carries no chrome fade down here, unlike at the top,
+            because nothing shares this corner with it — the settings button
+            stays where it has always been.
+
+            Held back until there is weather so the row cannot contribute its
+            own margin to an empty screen and push the meter up for nothing.
+          */
+          <BurnInGuard enabled={settings.burnInGuard} style={styles.footer}>
+            <Animated.View pointerEvents="none" style={{ opacity: dim }}>
+              {nowReadout}
+            </Animated.View>
+            <Animated.View pointerEvents="none" style={{ opacity: dim }}>
+              {placeReadout}
+            </Animated.View>
+          </BurnInGuard>
+        )}
+
         {settings.showMedia && (
           // Interactive, unlike the rest of the face: the bar has to receive
           // the swipe rather than let it fall through to the reveal tap.
@@ -420,6 +458,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   headerRight: { alignItems: 'flex-end', minHeight: 40, minWidth: 40 },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginBottom: space.md,
+  },
   menuSlot: { position: 'absolute', top: 0, right: 0 },
   controlButton: {
     width: 40,

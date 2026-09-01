@@ -15,6 +15,7 @@ import type {
   ShufflePeriod,
   WaveScale,
   WaveSpeed,
+  WeatherPosition,
 } from '@/clock/settings';
 import { lookFor } from '@/clock/shuffle';
 import { usePresets, MAX_PRESETS, type Preset } from '@/clock/presets';
@@ -89,6 +90,20 @@ const SHUFFLE_PERIODS: readonly Choice<ShufflePeriod>[] = [
 const UNITS: readonly Choice<TemperatureUnit>[] = [
   { id: 'celsius', name: 'celsius' },
   { id: 'fahrenheit', name: 'fahrenheit' },
+];
+
+/**
+ * Named for the corners rather than for an edge, because that is what
+ * actually moves: the readout keeps its shape and swaps which pair of corners
+ * it is pinned to.
+ *
+ * Not marked locked, unlike the rows around it. The position is a layout
+ * preference rather than any of the weather itself, and putting an asterisk
+ * on it would suggest the founder pack sells somewhere to put a temperature.
+ */
+const WEATHER_POSITIONS: readonly Choice<WeatherPosition>[] = [
+  { id: 'top', name: 'top corners' },
+  { id: 'bottom', name: 'bottom corners' },
 ];
 
 /**
@@ -562,6 +577,12 @@ export default function SettingsScreen() {
           onChange={(weatherDetail) => update({ weatherDetail })}
           tone={tone}
           locked={!founder}
+        />
+        <ChoiceRow
+          options={WEATHER_POSITIONS}
+          value={settings.weatherPosition}
+          onChange={(weatherPosition) => update({ weatherPosition })}
+          tone={tone}
         />
         <StatusRow
           title="source"
