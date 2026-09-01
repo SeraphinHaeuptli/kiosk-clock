@@ -48,6 +48,15 @@ export interface ClockSettings {
 
   /** Hold the screen on while the kiosk is in the foreground. */
   keepAwake: boolean;
+  /**
+   * Leave Android's status and navigation bars on screen.
+   *
+   * Off by default, because a clock filling the panel is the point of the
+   * thing. On for a device that is still a phone between docks, where losing
+   * the clock, the battery and the back gesture is a worse trade than a
+   * full-bleed face.
+   */
+  showSystemBars: boolean;
   /** Fade the face down overnight instead of glaring in a dark room. */
   nightDim: boolean;
   /** The window, in local hours. `from` after `to` wraps past midnight. */
@@ -113,6 +122,7 @@ export const DEFAULT_SETTINGS: ClockSettings = {
   showMedia: true,
 
   keepAwake: true,
+  showSystemBars: false,
   nightDim: true,
   nightFrom: 22,
   nightTo: 7,
@@ -245,6 +255,10 @@ export function decodeSettings(raw: unknown): ClockSettings {
     showMedia: bool(input.showMedia, DEFAULT_SETTINGS.showMedia),
 
     keepAwake: bool(input.keepAwake, DEFAULT_SETTINGS.keepAwake),
+    showSystemBars: bool(
+      input.showSystemBars,
+      DEFAULT_SETTINGS.showSystemBars,
+    ),
     nightDim: bool(input.nightDim, DEFAULT_SETTINGS.nightDim),
     nightFrom: ranged(input.nightFrom, DEFAULT_SETTINGS.nightFrom, 0, 23),
     nightTo: ranged(input.nightTo, DEFAULT_SETTINGS.nightTo, 0, 23),

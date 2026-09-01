@@ -469,6 +469,13 @@ export default function SettingsScreen() {
           tone={tone}
         />
         <CheckRow
+          title="system bars"
+          hint="keeps Android's status and navigation bars on screen"
+          checked={settings.showSystemBars}
+          onChange={(showSystemBars) => update({ showSystemBars })}
+          tone={tone}
+        />
+        <CheckRow
           title="night dimming"
           hint="fades the display through the hours you set"
           checked={settings.nightDim}

@@ -68,6 +68,19 @@ const DATE_ALLOWANCE = 44;
 /** Floor, so a very short box still renders something legible. */
 const MIN_FACE_SIZE = 14;
 
+/**
+ * Both system bars, together.
+ *
+ * Android surfaces them as one immersive state and restores them as one, so
+ * splitting this in two would mostly buy a combination nobody wants — a
+ * full-bleed clock wearing a status bar and no navigation bar reads as a
+ * layout bug rather than as a choice.
+ */
+function setSystemBarsHidden(hidden: boolean) {
+  SystemStatusBar.setHidden(hidden, 'fade');
+  if (Platform.OS === 'android') NavigationBar.setHidden(hidden);
+}
+
 export function KioskScreen() {
   const { settings, tone, ready } = useSettings();
   const billing = useBilling();
@@ -123,26 +136,29 @@ export function KioskScreen() {
   // Android draws system bars over a full-bleed clock, which it should not
   // have to share. Tied to focus rather than mount: they come back when
   // settings opens, so the app stays navigable.
+  const barsHidden = !settings.showSystemBars;
+
   useFocusEffect(
     useCallback(() => {
-      SystemStatusBar.setHidden(true, 'fade');
-      if (Platform.OS === 'android') NavigationBar.setHidden(true);
+      setSystemBarsHidden(barsHidden);
 
-      return () => {
-        SystemStatusBar.setHidden(false, 'fade');
-        if (Platform.OS === 'android') NavigationBar.setHidden(false);
-      };
-    }, []),
+      // Restored on the way out whatever the setting says, because the screens
+      // this hands off to are ordinary ones that need a way back.
+      return () => setSystemBarsHidden(false);
+    }, [barsHidden]),
   );
 
   // Hiding once on focus is not enough. Android restores the system bars when
   // the window changes configuration, so rotating the device — or flipping the
   // landscape lock, which rotates it — brings them straight back. Re-assert
   // whenever the window changes shape.
+  //
+  // Re-asserting a *visible* bar is not redundant either: the setting can be
+  // turned off while this screen is the one behind the modal, and the effect
+  // that restored them ran before it changed.
   useEffect(() => {
-    SystemStatusBar.setHidden(true, 'fade');
-    if (Platform.OS === 'android') NavigationBar.setHidden(true);
-  }, [width, height, settings.landscape]);
+    setSystemBarsHidden(barsHidden);
+  }, [barsHidden, width, height, settings.landscape]);
 
   useEffect(() => {
     ScreenOrientation.lockAsync(
