@@ -4,12 +4,19 @@ export interface DeviceTrack {
   title: string;
   artist: string | null;
   playing: boolean;
+  canNext: boolean;
+  canPrevious: boolean;
+  canPlayPause: boolean;
 }
+
+/** Play and pause are one command: only the session knows which is meant. */
+export type TransportAction = 'playPause' | 'next' | 'previous';
 
 interface NowPlayingNative {
   hasPermission(): boolean;
   openPermissionSettings(): void;
   getNowPlaying(): DeviceTrack | null;
+  control(action: TransportAction): boolean;
 }
 
 /**
@@ -44,5 +51,19 @@ export function readDeviceNowPlaying(): DeviceTrack | null {
     return native?.getNowPlaying() ?? null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Sends a transport command to whatever the device is playing.
+ *
+ * Answers whether the command was dispatched, not whether the player acted on
+ * it — the only honest report of that is the next read of the session.
+ */
+export function controlDevice(action: TransportAction): boolean {
+  try {
+    return native?.control(action) ?? false;
+  } catch {
+    return false;
   }
 }

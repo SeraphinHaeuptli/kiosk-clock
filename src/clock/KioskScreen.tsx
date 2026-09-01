@@ -378,6 +378,7 @@ export function KioskScreen() {
               onChange={volume.set}
               onDragChange={volume.setDragging}
               nowPlaying={nowPlaying.result}
+              onControl={nowPlaying.control}
             />
           </Animated.View>
         )}

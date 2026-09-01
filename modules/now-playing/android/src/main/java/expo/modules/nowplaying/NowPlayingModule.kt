@@ -46,6 +46,17 @@ class NowPlayingModule : Module() {
     }
 
     Function("getNowPlaying") { readNowPlaying() }
+
+    /**
+     * Drive the same session the bar is showing.
+     *
+     * A controller obtained this way carries transport controls as well as
+     * metadata — the notification-listener grant is what authorises both, so
+     * this asks for nothing the app was not already given. Returns whether the
+     * command went out, which is not the same as the player having obeyed it:
+     * the answer to that arrives on the next read, not from here.
+     */
+    Function("control") { action: String -> control(action) }
   }
 
   /**
@@ -83,7 +94,12 @@ class NowPlayingModule : Module() {
    * building an exception and a stack trace for once every five seconds for as
    * long as the device is docked.
    */
-  private fun readNowPlaying(): Map<String, Any?>? {
+  /**
+   * The one session the app speaks to, chosen the same way for reading and for
+   * controlling — otherwise a skip could land on a different player from the
+   * one named on screen.
+   */
+  private fun activeController(): MediaController? {
     if (!hasNotificationAccess()) return null
 
     return try {
@@ -95,14 +111,52 @@ class NowPlayingModule : Module() {
 
       // Sessions arrive in priority order, but a paused app can outrank the one
       // making noise, so prefer whatever is actually playing.
-      val controller =
-        sessions.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
-          ?: sessions.firstOrNull()
-          ?: return null
+      sessions.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
+        ?: sessions.firstOrNull()
+    } catch (error: Exception) {
+      null
+    }
+  }
 
+  private fun readNowPlaying(): Map<String, Any?>? {
+    val controller = activeController() ?: return null
+
+    return try {
       describe(controller)
     } catch (error: Exception) {
       null
+    }
+  }
+
+  /**
+   * Play/pause is resolved here rather than in the interface, because whether
+   * a session is playing is only knowable at the moment the command is sent.
+   * Deciding it one render earlier means a tap during the gap between the poll
+   * and the press sends the wrong one of the pair.
+   */
+  private fun control(action: String): Boolean {
+    val controller = activeController() ?: return false
+
+    return try {
+      val controls = controller.transportControls
+
+      when (action) {
+        "next" -> controls.skipToNext()
+        "previous" -> controls.skipToPrevious()
+        "playPause" ->
+          if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
+            controls.pause()
+          } else {
+            controls.play()
+          }
+        else -> return false
+      }
+
+      true
+    } catch (error: Exception) {
+      // Same binder failures as reading, plus a session that was released
+      // between being chosen and being told to do something.
+      false
     }
   }
 
@@ -115,11 +169,34 @@ class NowPlayingModule : Module() {
       ?.takeIf { it.isNotBlank() }
       ?: return null
 
+    val state = controller.playbackState
+    val actions = state?.actions ?: 0L
+
+    /*
+      What the session says it can do — and a session that says nothing is
+      taken at its word only when it has said something.
+
+      Plenty of Android players advertise an incomplete action mask, or none at
+      all, while responding to every command perfectly well. Hiding a control
+      on that evidence would leave the bar inert for apps that work, which is
+      the worse of the two mistakes: a button that does nothing is a moment's
+      annoyance, a missing button is a feature the user cannot reach. So an
+      empty mask means show everything, and a populated one is believed.
+    */
+    fun advertises(mask: Long): Boolean = actions == 0L || (actions and mask) != 0L
+
     return mapOf(
       "title" to title,
       "artist" to metadata.getString(MediaMetadata.METADATA_KEY_ARTIST)
         ?.takeIf { it.isNotBlank() },
-      "playing" to (controller.playbackState?.state == PlaybackState.STATE_PLAYING),
+      "playing" to (state?.state == PlaybackState.STATE_PLAYING),
+      "canNext" to advertises(PlaybackState.ACTION_SKIP_TO_NEXT),
+      "canPrevious" to advertises(PlaybackState.ACTION_SKIP_TO_PREVIOUS),
+      "canPlayPause" to advertises(
+        PlaybackState.ACTION_PLAY_PAUSE or
+          PlaybackState.ACTION_PLAY or
+          PlaybackState.ACTION_PAUSE,
+      ),
     )
   }
 }

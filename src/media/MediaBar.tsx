@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import {
   PanResponder,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -11,7 +12,11 @@ import * as Haptics from 'expo-haptics';
 import { label, surface, type Tone } from '@/design/palette';
 import { MONO_ASPECT, hairline, mono, space, type } from '@/design/tokens';
 
-import { trackLine, type NowPlayingResult } from './nowPlaying';
+import {
+  trackLine,
+  type NowPlayingResult,
+  type TransportAction,
+} from './nowPlaying';
 import { clampVolume, formatVolume } from './volume';
 
 const FILL = '█';
@@ -26,6 +31,53 @@ interface Props {
   onChange: (level: number) => void;
   onDragChange: (dragging: boolean) => void;
   nowPlaying: NowPlayingResult | null;
+  onControl: (action: TransportAction) => void;
+}
+
+/**
+ * One transport key.
+ *
+ * Sized well past the glyph it draws: two characters of a 13pt mono face is a
+ * target of about twelve points, and this is a device sitting at arm's length
+ * on a desk being prodded with a thumb.
+ */
+function Key({
+  mark,
+  hint,
+  enabled,
+  tone,
+  onPress,
+}: {
+  mark: string;
+  hint: string;
+  enabled: boolean;
+  tone: Tone;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={() => {
+        Haptics.selectionAsync().catch(() => {});
+        onPress();
+      }}
+      disabled={!enabled}
+      hitSlop={space.sm}
+      accessibilityRole="button"
+      accessibilityLabel={hint}
+      accessibilityState={{ disabled: !enabled }}
+      style={styles.key}
+    >
+      <Text
+        allowFontScaling={false}
+        style={[
+          styles.keyMark,
+          { color: enabled ? tone.color : label.quaternary },
+        ]}
+      >
+        {mark}
+      </Text>
+    </Pressable>
+  );
 }
 
 /**
@@ -43,6 +95,7 @@ export function MediaBar({
   onChange,
   onDragChange,
   nowPlaying,
+  onControl,
 }: Props) {
   const [cells, setCells] = useState(MIN_CELLS);
   const [width, setWidth] = useState(0);
@@ -65,7 +118,11 @@ export function MediaBar({
   const responder = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
+        // Not on touch-down, which would swallow every tap on the transport
+        // keys below before they saw it. Nothing happens on the press anyway:
+        // the level is only read when the finger starts moving, so waiting for
+        // movement costs the gesture nothing and gives the keys their taps.
+        onStartShouldSetPanResponder: () => false,
         onMoveShouldSetPanResponder: (_, gesture) =>
           // Claim the gesture only once it is clearly horizontal, so a vertical
           // swipe still belongs to whatever is behind the bar.
@@ -93,6 +150,20 @@ export function MediaBar({
     Haptics.selectionAsync().catch(() => {});
   }
   lastFilled.current = filled;
+
+  const track = nowPlaying?.track ?? null;
+
+  /*
+    Controls appear only for a session this app can actually reach.
+
+    An endpoint track is a report about a player on another machine, so there
+    is nothing to send a command to; showing keys for it would be the same
+    mistake as showing a live reading for a source that had gone stale.
+  */
+  const drivable =
+    nowPlaying?.from === 'device' &&
+    track !== null &&
+    (track.canPrevious || track.canPlayPause || track.canNext);
 
   const source =
     nowPlaying?.mode === 'stale'
@@ -135,6 +206,33 @@ export function MediaBar({
           volume
         </Text>
       </View>
+
+      {drivable && track && (
+        <View style={styles.transport}>
+          <Key
+            mark="|<<"
+            hint="Previous track"
+            enabled={track.canPrevious}
+            tone={tone}
+            onPress={() => onControl('previous')}
+          />
+          {/* The key shows the action, not the state: what a press will do. */}
+          <Key
+            mark={track.playing ? '||' : '>'}
+            hint={track.playing ? 'Pause' : 'Play'}
+            enabled={track.canPlayPause}
+            tone={tone}
+            onPress={() => onControl('playPause')}
+          />
+          <Key
+            mark=">>|"
+            hint="Next track"
+            enabled={track.canNext}
+            tone={tone}
+            onPress={() => onControl('next')}
+          />
+        </View>
+      )}
     </View>
   );
 }
@@ -157,4 +255,14 @@ const styles = StyleSheet.create({
   level: { ...type.small },
   bar: { fontFamily: mono, fontSize: FONT, lineHeight: FONT * 1.3 },
   meta: { ...type.tiny, color: label.tertiary, flexShrink: 1 },
+  transport: { flexDirection: 'row', gap: space.lg, paddingTop: space.xs },
+  // Fixed width so the middle key swapping between '>' and '||' does not
+  // shuffle the row sideways every time playback is toggled.
+  key: {
+    minWidth: 40,
+    paddingVertical: space.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  keyMark: { fontFamily: mono, fontSize: FONT, lineHeight: FONT * 1.3 },
 });

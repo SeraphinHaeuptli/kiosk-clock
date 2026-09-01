@@ -3,7 +3,13 @@ import { AppState } from 'react-native';
 
 import { useDebounced } from '@/core/useDebounced';
 
-import { loadNowPlaying, type NowPlayingResult } from './nowPlaying';
+import { controlDevice } from '../../modules/now-playing';
+
+import {
+  loadNowPlaying,
+  type NowPlayingResult,
+  type TransportAction,
+} from './nowPlaying';
 import {
   chooseSource,
   hasNotificationAccess,
@@ -16,6 +22,18 @@ import {
  */
 const REFRESH_MS = 5_000;
 const ENDPOINT_SETTLE_MS = 500;
+
+/**
+ * How long to wait before reading back a session that has just been told to do
+ * something.
+ *
+ * A transport command is one-way: it returns as soon as it has been handed
+ * over, and the player updates its own state a moment later. Reading only at
+ * the moment of the press gets the state the press was meant to change, so the
+ * pause button would show the wrong glyph until the next poll came round five
+ * seconds later.
+ */
+const SETTLE_MS = 400;
 
 const ENV_ENDPOINT = (
   process.env.EXPO_PUBLIC_NOW_PLAYING_ENDPOINT ?? ''
@@ -47,6 +65,7 @@ export function useNowPlaying(endpoint: string, enabled: boolean) {
   // Android offers no callback for it, so the only way to notice is to look.
   const [granted, setGranted] = useState(hasNotificationAccess);
   const generation = useRef(0);
+  const settle = useRef<ReturnType<typeof setTimeout>>(undefined);
   const settled = useDebounced(endpoint, ENDPOINT_SETTLE_MS);
   const source: SourceChoice = chooseSource(settled, granted);
 
@@ -69,6 +88,26 @@ export function useNowPlaying(endpoint: string, enabled: boolean) {
       });
   }, [settled, enabled]);
 
+  /**
+   * Send a command, then look again.
+   *
+   * Both reads are kept: the immediate one catches players that update
+   * synchronously, and the delayed one catches the rest. Neither can strand a
+   * stale answer on screen, because `refresh` discards anything a newer
+   * generation has overtaken.
+   */
+  const control = useCallback(
+    (action: TransportAction) => {
+      if (!enabled) return;
+      if (!controlDevice(action)) return;
+
+      refresh();
+      clearTimeout(settle.current);
+      settle.current = setTimeout(refresh, SETTLE_MS);
+    },
+    [enabled, refresh],
+  );
+
   useEffect(() => {
     if (!enabled) {
       setResult(null);
@@ -84,9 +123,10 @@ export function useNowPlaying(endpoint: string, enabled: boolean) {
     return () => {
       generation.current += 1;
       clearInterval(timer);
+      clearTimeout(settle.current);
       subscription.remove();
     };
   }, [refresh, enabled]);
 
-  return { result, source, refresh };
+  return { result, source, refresh, control };
 }

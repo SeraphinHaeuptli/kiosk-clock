@@ -8,6 +8,8 @@
 
 import { readDeviceNowPlaying } from '../../modules/now-playing';
 
+export type { TransportAction } from '../../modules/now-playing';
+
 const REQUEST_TIMEOUT_MS = 6_000;
 
 /**
@@ -27,6 +29,17 @@ export interface Track {
   title: string;
   artist: string | null;
   playing: boolean;
+  /**
+   * Whether this source can be driven at all, and with which commands.
+   *
+   * A track read off the device carries a live session behind it. One fetched
+   * from an endpoint is a report about a player somewhere else, with no way
+   * back to it — the same provenance distinction the rest of this file makes,
+   * applied to control rather than to freshness.
+   */
+  canNext: boolean;
+  canPrevious: boolean;
+  canPlayPause: boolean;
 }
 
 export type NowPlayingMode = 'none' | 'live' | 'stale';
@@ -76,6 +89,10 @@ function decodeTrack(raw: unknown): Track | null {
     title,
     artist: text(input.artist) ?? text(input.author) ?? null,
     playing,
+    // An endpoint describes a player this app cannot reach.
+    canNext: false,
+    canPrevious: false,
+    canPlayPause: false,
   };
 }
 
