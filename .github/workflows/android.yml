@@ -72,7 +72,17 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      # packages, rather than the action's default of 'tools platform-tools'.
+      # 'tools' is the long-deprecated SDK Tools bundle, and it drags in the
+      # emulator: several hundred megabytes this job has no use for, since it
+      # builds an APK and never boots one. It is also what broke run #24 —
+      # sdkmanager got something that was not a valid zip ("Error on ZipFile
+      # unknown archive") and the job died before Gradle started. Dropping it
+      # removes the download and the failure mode together; the runner image
+      # already ships the platforms and build-tools that AGP needs.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Decode the upload key
         id: signing
