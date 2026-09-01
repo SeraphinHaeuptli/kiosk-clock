@@ -113,6 +113,14 @@ export interface ClockSettings {
 
   /** Charge level under the clock, for a phone left on a dock. */
   showBattery: boolean;
+  /**
+   * A charge gauge in the corner of the audio bar.
+   *
+   * Independent of `showBattery` rather than a placement for it: the two are
+   * different readouts in different places, and someone docking a phone may
+   * well want the gauge by the volume and nothing under the clock face.
+   */
+  showBatteryMeter: boolean;
 }
 
 export const DEFAULT_SETTINGS: ClockSettings = {
@@ -159,6 +167,7 @@ export const DEFAULT_SETTINGS: ClockSettings = {
   countdownLabel: '',
 
   showBattery: false,
+  showBatteryMeter: false,
 };
 
 /** Exported so the shuffle can pick from them without importing components. */
@@ -346,6 +355,10 @@ export function decodeSettings(raw: unknown): ClockSettings {
     ),
 
     showBattery: bool(input.showBattery, DEFAULT_SETTINGS.showBattery),
+    showBatteryMeter: bool(
+      input.showBatteryMeter,
+      DEFAULT_SETTINGS.showBatteryMeter,
+    ),
   };
 }
 

@@ -475,6 +475,14 @@ export default function SettingsScreen() {
           tone={tone}
           locked={!founder}
         />
+        <CheckRow
+          title="battery gauge"
+          hint="a charge meter in the corner of the audio bar"
+          checked={settings.showBatteryMeter}
+          onChange={(showBatteryMeter) => update({ showBatteryMeter })}
+          tone={tone}
+          locked={!founder}
+        />
 
         <Heading>kiosk</Heading>
         <CheckRow

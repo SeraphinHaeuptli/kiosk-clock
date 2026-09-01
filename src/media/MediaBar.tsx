@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
+import { batteryLine } from '@/clock/extras';
 import { label, surface, type Tone } from '@/design/palette';
 import { MONO_ASPECT, hairline, mono, space, type } from '@/design/tokens';
 
@@ -23,6 +24,8 @@ const FILL = '█';
 const EMPTY = '░';
 const FONT = 13;
 const MIN_CELLS = 8;
+const CHARGE_FONT = 10;
+const CHARGE_CELLS = 5;
 
 interface Props {
   tone: Tone;
@@ -32,6 +35,14 @@ interface Props {
   onDragChange: (dragging: boolean) => void;
   nowPlaying: NowPlayingResult | null;
   onControl: (action: TransportAction) => void;
+  /** Charge to draw beside the transport keys, or null to draw none. */
+  battery: Charge | null;
+}
+
+export interface Charge {
+  /** 0 to 1. */
+  level: number;
+  charging: boolean;
 }
 
 /**
@@ -81,6 +92,66 @@ function Key({
 }
 
 /**
+ * A charge gauge, in the same block glyphs as the volume bar above it.
+ *
+ * Labelled, because the bar it sits under also ends in a percentage and two
+ * unlabelled percentages in one corner is a readout you have to think about.
+ *
+ * Not coloured by how low the charge is: this palette is one accent over
+ * greyscale, so a warning red would be the only saturated colour in the app.
+ * A gauge running empty already says empty, which is the whole of the job.
+ */
+function ChargeGauge({
+  level,
+  charging,
+  tone,
+}: {
+  level: number;
+  charging: boolean;
+  tone: Tone;
+}) {
+  const readout = batteryLine(level, charging);
+  // Null is a level the device would not vouch for, which is not the same as a
+  // level of zero: drawing an empty gauge for it would claim a phone about to
+  // die. Nothing is drawn instead.
+  if (readout === null) return null;
+
+  // Any charge at all keeps one cell lit, so an empty gauge means empty and
+  // not merely low: five cells put a tenth of a battery below half a cell, and
+  // a phone with 9% left reading the same as a dead one is the one rounding
+  // error in a charge meter worth spending a line to avoid.
+  const fraction = Math.min(1, Math.max(0, level));
+  const filled =
+    fraction === 0 ? 0 : Math.max(1, Math.round(fraction * CHARGE_CELLS));
+
+  return (
+    <View
+      style={styles.charge}
+      accessible
+      accessibilityRole="text"
+      accessibilityLabel={`Battery ${readout.replace(' +', ', charging')}`}
+    >
+      <Text style={styles.meta} allowFontScaling={false}>
+        bat
+      </Text>
+      {/* One Text, so the cells butt together the way the volume bar's do
+          rather than picking up the tiny type's letter spacing. */}
+      <Text style={styles.chargeCells} allowFontScaling={false}>
+        <Text style={{ color: label.quaternary }}>[</Text>
+        <Text style={{ color: tone.color }}>{FILL.repeat(filled)}</Text>
+        <Text style={{ color: label.quaternary }}>
+          {EMPTY.repeat(CHARGE_CELLS - filled)}
+        </Text>
+        <Text style={{ color: label.quaternary }}>]</Text>
+      </Text>
+      <Text style={styles.meta} allowFontScaling={false}>
+        {readout}
+      </Text>
+    </View>
+  );
+}
+
+/**
  * Now playing, over a volume bar you drag sideways.
  *
  * The gesture is relative, not absolute: a swipe moves the level by how far
@@ -96,6 +167,7 @@ export function MediaBar({
   onDragChange,
   nowPlaying,
   onControl,
+  battery,
 }: Props) {
   const [cells, setCells] = useState(MIN_CELLS);
   const [width, setWidth] = useState(0);
@@ -160,7 +232,7 @@ export function MediaBar({
     is nothing to send a command to; showing keys for it would be the same
     mistake as showing a live reading for a source that had gone stale.
   */
-  const drivable =
+  const shownTransport =
     nowPlaying?.from === 'device' &&
     track !== null &&
     (track.canPrevious || track.canPlayPause || track.canNext);
@@ -207,30 +279,50 @@ export function MediaBar({
         </Text>
       </View>
 
-      {drivable && track && (
-        <View style={styles.transport}>
-          <Key
-            mark="|<<"
-            hint="Previous track"
-            enabled={track.canPrevious}
-            tone={tone}
-            onPress={() => onControl('previous')}
-          />
-          {/* The key shows the action, not the state: what a press will do. */}
-          <Key
-            mark={track.playing ? '||' : '>'}
-            hint={track.playing ? 'Pause' : 'Play'}
-            enabled={track.canPlayPause}
-            tone={tone}
-            onPress={() => onControl('playPause')}
-          />
-          <Key
-            mark=">>|"
-            hint="Next track"
-            enabled={track.canNext}
-            tone={tone}
-            onPress={() => onControl('next')}
-          />
+      {/*
+        Both halves share one row: the keys sit on the left and the charge is
+        pushed to the right edge by an auto margin, so it lands under the
+        'volume' label whether or not there are keys to sit beside.
+
+        The row is held back entirely when it would be empty, so a bar with
+        neither keys nor a battery keeps the height it had before either.
+      */}
+      {(shownTransport || battery !== null) && (
+        <View style={styles.bottom}>
+          {shownTransport && track && (
+            <View style={styles.transport}>
+              <Key
+                mark="|<<"
+                hint="Previous track"
+                enabled={track.canPrevious}
+                tone={tone}
+                onPress={() => onControl('previous')}
+              />
+              {/* The key shows the action, not the state: what a press does. */}
+              <Key
+                mark={track.playing ? '||' : '>'}
+                hint={track.playing ? 'Pause' : 'Play'}
+                enabled={track.canPlayPause}
+                tone={tone}
+                onPress={() => onControl('playPause')}
+              />
+              <Key
+                mark=">>|"
+                hint="Next track"
+                enabled={track.canNext}
+                tone={tone}
+                onPress={() => onControl('next')}
+              />
+            </View>
+          )}
+
+          {battery && (
+            <ChargeGauge
+              level={battery.level}
+              charging={battery.charging}
+              tone={tone}
+            />
+          )}
         </View>
       )}
     </View>
@@ -255,7 +347,17 @@ const styles = StyleSheet.create({
   level: { ...type.small },
   bar: { fontFamily: mono, fontSize: FONT, lineHeight: FONT * 1.3 },
   meta: { ...type.tiny, color: label.tertiary, flexShrink: 1 },
-  transport: { flexDirection: 'row', gap: space.lg, paddingTop: space.xs },
+  bottom: { flexDirection: 'row', alignItems: 'center', paddingTop: space.xs },
+  transport: { flexDirection: 'row', gap: space.lg },
+  // Auto margin rather than 'space-between': the charge has to hold the right
+  // edge even when it is the only thing in the row.
+  charge: {
+    marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+  },
+  chargeCells: { fontFamily: mono, fontSize: CHARGE_FONT },
   // Fixed width so the middle key swapping between '>' and '||' does not
   // shuffle the row sideways every time playback is toggled.
   key: {

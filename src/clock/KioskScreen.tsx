@@ -121,7 +121,8 @@ export function KioskScreen() {
   );
   const volume = useVolume(settings.showMedia);
   const weather = useWeather(settings.weatherPlace, settings.showWeather);
-  const battery = useBattery(settings.showBattery);
+  // Either readout brings the subscription up; neither leaves it down.
+  const battery = useBattery(settings.showBattery || settings.showBatteryMeter);
 
   /* -- Kiosk behaviours ---------------------------------------------------- */
 
@@ -390,9 +391,13 @@ export function KioskScreen() {
                   settings.countdownLabel,
                   now,
                 ),
-                battery.level === null
-                  ? null
-                  : batteryLine(battery.level, battery.charging),
+                // Checks the setting and not just the reading: the reading is
+                // live whenever either battery readout is on, so leaning on a
+                // null level to hide this one would put it back on screen for
+                // anyone who wanted only the gauge in the audio bar.
+                settings.showBattery && battery.level !== null
+                  ? batteryLine(battery.level, battery.charging)
+                  : null,
               ]}
             />
           </BurnInGuard>
@@ -433,6 +438,11 @@ export function KioskScreen() {
               onDragChange={volume.setDragging}
               nowPlaying={nowPlaying.result}
               onControl={nowPlaying.control}
+              battery={
+                settings.showBatteryMeter && battery.level !== null
+                  ? { level: battery.level, charging: battery.charging }
+                  : null
+              }
             />
           </Animated.View>
         )}
