@@ -60,15 +60,32 @@ export function BillingProvider({ children }: { children: ReactNode }) {
 
     // Entitlements gate the UI, so they are awaited; the offer is only a price
     // string on one screen and is allowed to arrive late or not at all.
-    activeBilling.load().then((entitlements) => {
-      if (!active) return;
-      setFounder(has(entitlements));
-      setReady(true);
-    });
+    //
+    // The port undertakes not to throw, and both implementations keep to it —
+    // but `ready` is what tells the rest of the app the answer has arrived, so
+    // it is set from `finally`. A rejection that left it false would suppress
+    // the watermark for the life of the process, which is the failure that
+    // costs money rather than the one that shows an error.
+    activeBilling
+      .load()
+      .then((entitlements) => {
+        if (active) setFounder(has(entitlements));
+      })
+      .catch(() => {
+        // Not bought, which is where the state already is.
+      })
+      .finally(() => {
+        if (active) setReady(true);
+      });
 
-    activeBilling.offer().then((next) => {
-      if (active) setOffer(next);
-    });
+    activeBilling
+      .offer()
+      .then((next) => {
+        if (active) setOffer(next);
+      })
+      .catch(() => {
+        // No price line. The screen already renders that case.
+      });
 
     return () => {
       active = false;
@@ -83,6 +100,15 @@ export function BillingProvider({ children }: { children: ReactNode }) {
         setFounder(has(outcome.entitlements));
       }
       return outcome;
+    } catch (error) {
+      // The purchase screen renders outcomes and has nowhere to put a
+      // rejection, so a store adapter that threw instead of answering left the
+      // buy button doing nothing at all with no explanation. Turned into the
+      // outcome it should have been.
+      return {
+        status: 'failed',
+        reason: error instanceof Error ? error.message : 'the store failed',
+      };
     } finally {
       if (mounted.current) setBusy(false);
     }
@@ -95,6 +121,10 @@ export function BillingProvider({ children }: { children: ReactNode }) {
       const owned = has(entitlements);
       if (mounted.current) setFounder(owned);
       return owned;
+    } catch {
+      // Same rationale as purchase: nothing found is a result the screen knows
+      // how to say, and a rejection is not.
+      return false;
     } finally {
       if (mounted.current) setBusy(false);
     }

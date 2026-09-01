@@ -53,12 +53,19 @@ export function useBattery(enabled: boolean): BatteryReading {
         // Android only reports level changes at significant thresholds, so
         // this is a trickle of events rather than a stream — no polling, and
         // nothing to throttle.
+        // Recorded one at a time: both arguments of a single push are
+        // evaluated before either is stored, so a second listener that threw
+        // left the first one already registered with nothing holding it, and
+        // on a clock left docked for days that is a subscription outliving
+        // every screen it belonged to.
         subscriptions.push(
           Battery.addBatteryLevelListener(({ batteryLevel }) => {
             if (active) {
               setReading((current) => ({ ...current, level: batteryLevel }));
             }
           }),
+        );
+        subscriptions.push(
           Battery.addBatteryStateListener(({ batteryState }) => {
             if (active) {
               setReading((current) => ({
@@ -75,7 +82,16 @@ export function useBattery(enabled: boolean): BatteryReading {
 
     return () => {
       active = false;
-      for (const subscription of subscriptions) subscription.remove();
+      for (const subscription of subscriptions) {
+        // One that refuses to come off must not stop the others coming off,
+        // and a throw here is inside an effect cleanup, where nothing catches
+        // it and it takes the screen down.
+        try {
+          subscription.remove();
+        } catch {
+          // Already gone.
+        }
+      }
     };
   }, [enabled]);
 

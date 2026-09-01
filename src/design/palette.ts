@@ -75,15 +75,41 @@ function hslToRgb(
   ];
 }
 
-export function customTone(hue: number): Tone {
-  const [r, g, b] = hslToRgb(hue, CUSTOM_SATURATION, CUSTOM_LIGHTNESS);
+/**
+ * One object per hue, kept rather than rebuilt on every call.
+ *
+ * The backdrop is wrapped in `memo`, and daylight is quantised upstream for
+ * the sole purpose of letting that comparison hold — it is what keeps a full
+ * screen of characters being redrawn a few times an hour instead of once a
+ * second. Handing back a fresh object defeated it completely: picking a custom
+ * colour quietly switched the memo off and put the whole field back on the
+ * clock's tick, on exactly the cheap hardware that can least afford it.
+ */
+const customTones = new Map<number, Tone>();
 
-  return {
+/**
+ * Bounded so a caller sweeping the hue continuously cannot grow this without
+ * limit. Cleared wholesale rather than evicted one at a time: only a hue or
+ * two is ever in play, so a flush costs one rebuilt object.
+ */
+const MAX_CUSTOM_TONES = 512;
+
+export function customTone(hue: number): Tone {
+  const cached = customTones.get(hue);
+  if (cached) return cached;
+
+  const [r, g, b] = hslToRgb(hue, CUSTOM_SATURATION, CUSTOM_LIGHTNESS);
+  const tone: Tone = {
     id: 'custom',
     name: 'custom',
     color: `rgb(${r}, ${g}, ${b})`,
     dim: `rgba(${r}, ${g}, ${b}, 0.45)`,
   };
+
+  if (customTones.size >= MAX_CUSTOM_TONES) customTones.clear();
+  customTones.set(hue, tone);
+
+  return tone;
 }
 
 export function toneOf(id: ToneId, hue: number = DEFAULT_HUE): Tone {

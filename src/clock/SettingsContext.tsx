@@ -42,11 +42,23 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    slot.load().then((stored) => {
-      if (!active) return;
-      setSettings(stored);
-      setReady(true);
-    });
+
+    // `ready` is set from `finally` rather than from the success path. It gates
+    // the whole kiosk, and the one thing worse than a clock that has lost its
+    // settings is a clock that shows a black screen for as long as the app
+    // stays open because the read never came back with anything.
+    slot
+      .load()
+      .then((stored) => {
+        if (active) setSettings(stored);
+      })
+      .catch(() => {
+        // Defaults are already in state. There is nothing else to fall back to.
+      })
+      .finally(() => {
+        if (active) setReady(true);
+      });
+
     return () => {
       active = false;
     };

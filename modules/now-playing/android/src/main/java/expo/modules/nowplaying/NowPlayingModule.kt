@@ -29,11 +29,20 @@ class NowPlayingModule : Module() {
 
     Function("hasPermission") { hasNotificationAccess() }
 
+    // Not every Android build has this screen. Stripped OEM ROMs and TV
+    // launchers ship without the notification-listener settings activity, and
+    // the resulting ActivityNotFoundException is the caller's problem to
+    // handle, not the user's to see: the button does nothing, which is already
+    // the truth of the situation on such a device.
     Function("openPermissionSettings") {
-      context.startActivity(
-        Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-          .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-      )
+      try {
+        context.startActivity(
+          Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+      } catch (error: Exception) {
+        // Nowhere to send them.
+      }
     }
 
     Function("getNowPlaying") { readNowPlaying() }
@@ -44,21 +53,43 @@ class NowPlayingModule : Module() {
    * is no callback for the grant: the user leaves for system settings and
    * comes back, so callers re-check rather than being told.
    */
-  private fun hasNotificationAccess(): Boolean {
+  private fun hasNotificationAccess(): Boolean = try {
     val enabled = Settings.Secure.getString(
       context.contentResolver,
       "enabled_notification_listeners",
-    ) ?: return false
+    )
 
-    return enabled.split(':').any { it.startsWith("${context.packageName}/") }
+    enabled != null &&
+      enabled.split(':').any { it.startsWith("${context.packageName}/") }
+  } catch (error: Exception) {
+    // A secure setting read goes through a content provider and out to
+    // system_server, and there is no context to read it from at all while the
+    // app is being torn down. Not granted is the safe answer to every one of
+    // those, and this is polled every few seconds for hours at a time.
+    false
   }
 
+  /**
+   * Everything below the permission check is a binder call into system_server,
+   * so the failures are the ones that come with talking to another process.
+   *
+   * Catching only SecurityException was reading the documentation rather than
+   * the field reports: the grant being revoked mid-call is merely the tidiest
+   * way this fails. getActiveSessions also throws when system_server has
+   * restarted underneath a long-running app, a MediaController can be released
+   * between being handed over and being read, and MEDIA_SESSION_SERVICE is not
+   * guaranteed to resolve on every OEM build the app installs on. All of them
+   * mean the same thing to a clock — no track — and none of them is worth
+   * building an exception and a stack trace for once every five seconds for as
+   * long as the device is docked.
+   */
   private fun readNowPlaying(): Map<String, Any?>? {
     if (!hasNotificationAccess()) return null
 
     return try {
       val manager =
-        context.getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
+        context.getSystemService(Context.MEDIA_SESSION_SERVICE) as? MediaSessionManager
+          ?: return null
       val listener = ComponentName(context, KioskNotificationListener::class.java)
       val sessions = manager.getActiveSessions(listener)
 
@@ -70,8 +101,7 @@ class NowPlayingModule : Module() {
           ?: return null
 
       describe(controller)
-    } catch (error: SecurityException) {
-      // The grant can be revoked between the check above and this call.
+    } catch (error: Exception) {
       null
     }
   }

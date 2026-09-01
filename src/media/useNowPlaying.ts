@@ -57,9 +57,16 @@ export function useNowPlaying(endpoint: string, enabled: boolean) {
     const nowGranted = hasNotificationAccess();
     setGranted(nowGranted);
 
-    loadNowPlaying(settled, nowGranted).then((next) => {
-      if (token === generation.current) setResult(next);
-    });
+    loadNowPlaying(settled, nowGranted)
+      .then((next) => {
+        if (token === generation.current) setResult(next);
+      })
+      .catch(() => {
+        // The load reports its failures rather than throwing them, but it
+        // reaches across the bridge into a native module every five seconds
+        // for as long as the clock is docked. The rejection it was never meant
+        // to produce must not become an unhandled one on hour six.
+      });
   }, [settled, enabled]);
 
   useEffect(() => {

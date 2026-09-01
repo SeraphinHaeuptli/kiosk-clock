@@ -34,7 +34,8 @@
     "backgroundColor": "#000000",
     "plugins": [
       "expo-router",
-      "./plugins/withReleaseSigning"
+      "./plugins/withReleaseSigning",
+      "./plugins/withReleaseOptimization"
     ]
   }
 }

@@ -42,6 +42,22 @@ const USER_AGENT =
 
 const REQUEST_TIMEOUT_MS = 8_000;
 
+/**
+ * Cap on what either service is allowed to hand back.
+ *
+ * Neither of them answers with anything close to this: a compact forecast is
+ * tens of kilobytes, and a single geocode hit is a few hundred bytes. What
+ * does is whatever is really on the other end — a captive portal on café or
+ * hotel wifi answers every request with its own page, and a kiosk left behind
+ * one asks again every half hour for as long as it sits there. `json()` parses
+ * whatever it is handed, and on a phone with a gigabyte of RAM that is the
+ * difference between an empty corner and the process being killed.
+ *
+ * Measured after reading as text rather than from Content-Length, which is set
+ * by the same server being distrusted and is absent on a chunked response.
+ */
+const MAX_RESPONSE_BYTES = 512 * 1024;
+
 export type WeatherFailure = { ok: false; reason: string };
 export type WeatherSuccess<T> = { ok: true; value: T };
 export type Fetched<T> = WeatherSuccess<T> | WeatherFailure;
@@ -63,7 +79,12 @@ async function getJson(url: string): Promise<Fetched<unknown>> {
       signal: controller.signal,
     });
     if (!response.ok) return { ok: false, reason: `HTTP ${response.status}` };
-    return { ok: true, value: await response.json() };
+
+    const body = await response.text();
+    if (body.length > MAX_RESPONSE_BYTES) {
+      return { ok: false, reason: 'response too large' };
+    }
+    return { ok: true, value: JSON.parse(body) };
   } catch (error) {
     return { ok: false, reason: describe(error) };
   } finally {

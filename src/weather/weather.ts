@@ -212,6 +212,17 @@ export function decodeForecast(raw: unknown, now: Date): Weather | null {
   };
 }
 
+/**
+ * Longest place name kept.
+ *
+ * The corner clips at a fixed width, so this is not about layout: the label is
+ * written to storage and handed to a Text node on every frame, and it is taken
+ * whole from a field on someone else's service. Cutting it here is what stops
+ * an answer that was not a place name from being carried around for the life
+ * of the install.
+ */
+const MAX_LABEL_LENGTH = 120;
+
 /** Reads the first hit from a Nominatim `format=jsonv2` search. */
 export function decodePlace(raw: unknown): Place | null {
   const first = Array.isArray(raw) ? asRecord(raw[0]) : null;
@@ -230,7 +241,10 @@ export function decodePlace(raw: unknown): Place | null {
     longitude,
     // `name` is the place itself; `display_name` is the full postal address,
     // of which only the first part belongs in a corner.
-    label: name || display.split(',')[0]?.trim() || 'unknown',
+    label: (name || display.split(',')[0]?.trim() || 'unknown').slice(
+      0,
+      MAX_LABEL_LENGTH,
+    ),
   };
 }
 

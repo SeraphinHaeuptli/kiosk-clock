@@ -87,11 +87,21 @@ export function usePresets() {
 
   useEffect(() => {
     let active = true;
-    slot.load().then((stored) => {
-      if (!active) return;
-      setPresets(stored);
-      setReady(true);
-    });
+
+    // Same reason as the settings slot: `ready` has to arrive whatever the
+    // read did, or the list it gates never stops looking like it is loading.
+    slot
+      .load()
+      .then((stored) => {
+        if (active) setPresets(stored);
+      })
+      .catch(() => {
+        // An empty list is the honest answer when the store will not say.
+      })
+      .finally(() => {
+        if (active) setReady(true);
+      });
+
     return () => {
       active = false;
     };

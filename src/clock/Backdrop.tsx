@@ -1,6 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  AppState,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -23,6 +24,101 @@ interface Props {
   light: number;
   waveSpeed: WaveSpeed;
   waveScale: WaveScale;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Shared machinery for the character fields                                  */
+/* -------------------------------------------------------------------------- */
+
+const SPACE = 32;
+const NEWLINE = 10;
+
+/**
+ * How many character codes go over to `String.fromCharCode` at a time. It
+ * takes its arguments spread, and a screenful is thousands of them — more than
+ * an engine will accept in one call — so the buffer goes over in blocks.
+ */
+const BLOCK = 1024;
+
+/**
+ * Turns a screen buffer of character codes into the string a `<Text>` wants.
+ *
+ * The fields used to append to a string inside the sampling loop, which meant
+ * one string allocation per cell — thirty thousand a second on a phone, a
+ * hundred thousand on a tablet — and the collector was doing more work than
+ * the noise was. Writing codes into a buffer that outlives the frame and
+ * converting it in a handful of calls keeps the allocation count flat.
+ */
+function textFrom(codes: Uint16Array): string {
+  const length = codes.length;
+  let out = '';
+
+  for (let at = 0; at < length; at += BLOCK) {
+    const block = codes.subarray(at, Math.min(at + BLOCK, length));
+    // `apply` wants an array-like, which a typed array is; the lib types only
+    // admit a real array.
+    out += String.fromCharCode.apply(null, block as unknown as number[]);
+  }
+
+  return out;
+}
+
+/**
+ * A blank screen buffer, one row per line with a newline between rows.
+ *
+ * Laying the newlines in once — they never move for a given screen size — is
+ * what lets a frame be drawn by blanking the buffer and writing only the cells
+ * that carry ink.
+ */
+function screenBuffer(rows: number, columns: number): Uint16Array {
+  // Guarded because the length expression goes to -1 at zero rows, and a
+  // negative typed-array length throws rather than giving back an empty one.
+  // A screen measured at zero height is not hypothetical: the static web
+  // export renders before useWindowDimensions has anything to report.
+  const codes = new Uint16Array(Math.max(0, rows * (columns + 1) - 1));
+  codes.fill(SPACE);
+
+  for (let row = 1; row < rows; row += 1) {
+    codes[row * (columns + 1) - 1] = NEWLINE;
+  }
+
+  return codes;
+}
+
+/** Blanks a buffer's cells, leaving the newlines that separate its rows. */
+function blank(codes: Uint16Array, rows: number, columns: number): void {
+  const stride = columns + 1;
+
+  for (let row = 0; row < rows; row += 1) {
+    const start = row * stride;
+    codes.fill(SPACE, start, start + columns);
+  }
+}
+
+/**
+ * Whether the app is actually in front of someone.
+ *
+ * The two animated fields redraw eleven times a second off a timer, and an
+ * Android JS timer keeps firing after the user walks away — a docked clock
+ * whose screen had gone dark was still sampling a full screen of noise into a
+ * string nobody could see, for as long as the process lived. Nothing about the
+ * motion is observable while it is away, so the timer stops and the field
+ * picks up from where it paused. Defaults to visible: assuming the worst here
+ * would be a black backdrop on any device whose first AppState reading is
+ * something other than `active`.
+ */
+function useOnScreen(): boolean {
+  const [onScreen, setOnScreen] = useState(true);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      setOnScreen(state === 'active');
+    });
+
+    return () => subscription.remove();
+  }, []);
+
+  return onScreen;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -92,6 +188,12 @@ function Stars({ tone, light }: { tone: Tone; light: number }) {
   // midday. Full darkness still gives full brightness, so nights are unchanged.
   const darkness = withFloor(1 - light, STAR_FLOOR);
 
+  // Two hundred separately placed text nodes, and each one carries a font size
+  // and an opacity of its own, so there is no collapsing them into a block the
+  // way the wave and rain fields are drawn. Memoising the built nodes was
+  // tried and removed: this component only renders when the backdrop's own
+  // memo lets a change through, and every such change moves `darkness`, so the
+  // cache missed on all of them and hit on none.
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {stars.map((star, index) => (
@@ -123,14 +225,17 @@ const DITHER_FLOOR = 0.2;
 const DITHER_GAIN = 0.4;
 
 /**
- * Deliberately tops out at '*'. With '#' in the ramp the midday field turned
- * into a wall of ink that the clock and the meter had to fight through.
+ * Blank through dense. Deliberately tops out at '*': with '#' in the ramp the
+ * midday field turned into a wall of ink that the clock and the meter had to
+ * fight through.
  */
-function shadeFor(value: number): string {
-  if (value > 0.42) return '*';
-  if (value > 0.22) return ':';
-  if (value > 0) return '.';
-  return ' ';
+const DITHER_RAMP = Uint16Array.from(' .:*', (mark) => mark.charCodeAt(0));
+
+function shadeFor(value: number): number {
+  if (value > 0.42) return DITHER_RAMP[3];
+  if (value > 0.22) return DITHER_RAMP[2];
+  if (value > 0) return DITHER_RAMP[1];
+  return DITHER_RAMP[0];
 }
 
 /** A character field whose density rises and falls with the day. */
@@ -141,36 +246,64 @@ function Dither({ tone, light }: { tone: Tone; light: number }) {
   const rows = Math.ceil(height / DITHER_LINE);
 
   // One stable noise value per cell; the threshold moves, the noise does not.
-  const grid = useMemo(
-    () =>
-      Array.from({ length: rows }, (_, row) =>
-        Array.from({ length: columns }, (_, column) =>
-          noise(row * 1361 + column * 17 + 1),
-        ),
-      ),
-    [rows, columns],
+  const grid = useMemo(() => {
+    const cells = new Float64Array(rows * columns);
+
+    for (let row = 0; row < rows; row += 1) {
+      for (let column = 0; column < columns; column += 1) {
+        cells[row * columns + column] = noise(row * 1361 + column * 17 + 1);
+      }
+    }
+
+    return cells;
+  }, [rows, columns]);
+
+  const threshold = DITHER_FLOOR + light * DITHER_GAIN;
+
+  /*
+    One `<Text>` per row rather than one for the whole field, unlike the wave
+    and rain backdrops. It is not an oversight: a single block would let
+    `lineHeight` set the row pitch exactly, where separate elements each carry
+    a line box driven by the font's own ascent and descent, which at this size
+    is taller than seventeen points. The field would tighten up and get denser.
+    The rows are cheap to hold across renders, and the day only moves the
+    threshold a few dozen times between midnights.
+  */
+  const lines = useMemo(() => {
+    const out: string[] = [];
+    const row = new Uint16Array(columns);
+
+    for (let index = 0; index < rows; index += 1) {
+      const base = index * columns;
+
+      for (let column = 0; column < columns; column += 1) {
+        row[column] = shadeFor(threshold - grid[base + column]);
+      }
+
+      out.push(textFrom(row));
+    }
+
+    return out;
+  }, [grid, rows, columns, threshold]);
+
+  const style = useMemo(
+    () => ({
+      fontFamily: mono,
+      fontSize: DITHER_FONT,
+      lineHeight: DITHER_LINE,
+      color: tone.color,
+      // Under a tenth the field was drawn at 21/255 at its brightest, which is
+      // below what a phone screen shows in a lit room.
+      opacity: 0.24,
+    }),
+    [tone.color],
   );
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {grid.map((cells, row) => (
-        <Text
-          key={row}
-          allowFontScaling={false}
-          numberOfLines={1}
-          style={{
-            fontFamily: mono,
-            fontSize: DITHER_FONT,
-            lineHeight: DITHER_LINE,
-            color: tone.color,
-            // Under a tenth the field was drawn at 21/255 at its brightest,
-            // which is below what a phone screen shows in a lit room.
-            opacity: 0.24,
-          }}
-        >
-          {cells
-            .map((cell) => shadeFor(DITHER_FLOOR + light * DITHER_GAIN - cell))
-            .join('')}
+      {lines.map((line, row) => (
+        <Text key={row} allowFontScaling={false} numberOfLines={1} style={style}>
+          {line}
         </Text>
       ))}
     </View>
@@ -184,6 +317,9 @@ const WAVE_FONT = 12;
 const WAVE_LINE = 15;
 /** Blank through dense. The leading space is what lets the field breathe. */
 const WAVE_RAMP = [' ', '.', ':', '-', '=', '+', '*', '#'];
+const WAVE_RAMP_CODES = Uint16Array.from(WAVE_RAMP, (mark) =>
+  mark.charCodeAt(0),
+);
 /** Below this the field is blank, so the wave reads as crests, not a wash. */
 const WAVE_FLOOR = 0.46;
 
@@ -222,59 +358,84 @@ function Wave({
 }) {
   const { width, height } = useWindowDimensions();
   const [frame, setFrame] = useState(0);
+  const onScreen = useOnScreen();
 
   const step = WAVE_STEP[speed];
 
   useEffect(() => {
-    if (step === 0) return;
+    if (step === 0 || !onScreen) return;
     const timer = setInterval(() => setFrame((n) => n + 1), WAVE_FRAME_MS);
     return () => clearInterval(timer);
-  }, [step]);
+  }, [step, onScreen]);
 
   const columns = Math.floor(width / (WAVE_FONT * MONO_ASPECT));
   const rows = Math.ceil(height / WAVE_LINE);
   const frequency = WAVE_FREQUENCY[scale];
   const drift = frame * step;
 
-  const lines = useMemo(() => {
-    const out: string[] = [];
-
-    for (let row = 0; row < rows; row += 1) {
-      // Sample in screen points rather than grid indices, so the field stays
-      // isotropic despite characters being much taller than they are wide.
-      const y = row * WAVE_LINE * frequency;
-      let line = '';
-
-      for (let column = 0; column < columns; column += 1) {
-        const x = column * WAVE_FONT * MONO_ASPECT * frequency;
-        const value = field(x + drift, y - drift * 0.6);
-        const shaped = (value - WAVE_FLOOR) / (1 - WAVE_FLOOR);
-        const index = Math.floor(Math.max(0, shaped) * WAVE_RAMP.length);
-        line += WAVE_RAMP[Math.min(WAVE_RAMP.length - 1, index)];
-      }
-
-      out.push(line);
+  /*
+    Where each cell sits in noise space, and the buffer the frame is drawn
+    into. All three depend on the screen and the scale, not on the clock, so
+    they are cut once and then written over in place. Recomputing the two
+    multiplications per cell every frame was three thousand of them eleven
+    times a second to arrive at the same numbers.
+  */
+  const plan = useMemo(() => {
+    // Sample in screen points rather than grid indices, so the field stays
+    // isotropic despite characters being much taller than they are wide.
+    const xs = new Float64Array(columns);
+    for (let column = 0; column < columns; column += 1) {
+      xs[column] = column * WAVE_FONT * MONO_ASPECT * frequency;
     }
 
-    return out;
-  }, [rows, columns, frequency, drift]);
+    const ys = new Float64Array(rows);
+    for (let row = 0; row < rows; row += 1) {
+      ys[row] = row * WAVE_LINE * frequency;
+    }
+
+    return { xs, ys, codes: screenBuffer(rows, columns) };
+  }, [rows, columns, frequency]);
+
+  const text = useMemo(() => {
+    const { xs, ys, codes } = plan;
+    const stride = columns + 1;
+    const yDrift = drift * 0.6;
+    const last = WAVE_RAMP_CODES.length - 1;
+
+    for (let row = 0; row < rows; row += 1) {
+      const y = ys[row] - yDrift;
+      let at = row * stride;
+
+      for (let column = 0; column < columns; column += 1) {
+        const value = field(xs[column] + drift, y);
+        const shaped = (value - WAVE_FLOOR) / (1 - WAVE_FLOOR);
+        const index = ((shaped > 0 ? shaped : 0) * WAVE_RAMP_CODES.length) | 0;
+        codes[at] = WAVE_RAMP_CODES[index < last ? index : last];
+        at += 1;
+      }
+    }
+
+    return textFrom(codes);
+  }, [plan, rows, columns, drift]);
+
+  const style = useMemo(
+    () => ({
+      fontFamily: mono,
+      fontSize: WAVE_FONT,
+      lineHeight: WAVE_LINE,
+      color: tone.color,
+      opacity: 0.30,
+    }),
+    [tone.color],
+  );
 
   return (
     <View
       style={[StyleSheet.absoluteFill, styles.clip]}
       pointerEvents="none"
     >
-      <Text
-        allowFontScaling={false}
-        style={{
-          fontFamily: mono,
-          fontSize: WAVE_FONT,
-          lineHeight: WAVE_LINE,
-          color: tone.color,
-          opacity: 0.30,
-        }}
-      >
-        {lines.join('\n')}
+      <Text allowFontScaling={false} style={style}>
+        {text}
       </Text>
     </View>
   );
@@ -457,14 +618,11 @@ function Scan({ tone, light }: { tone: Tone; light: number }) {
   // shows in a lit room, which is the same failure the dither field had.
   const ink = withAlpha(tone.color, 0.09 + strength * 0.15);
 
-  const translateY = sweep.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-SCAN_BAND, height],
-  });
-
-  return (
-    <View style={[StyleSheet.absoluteFill, styles.clip]} pointerEvents="none">
-      {Array.from({ length: lines }, (_, index) => (
+  // A hundred-odd fixed hairlines. Rebuilding them whenever the day moved the
+  // ink was a hundred style objects for a pattern that had not moved a pixel.
+  const mask = useMemo(
+    () =>
+      Array.from({ length: lines }, (_, index) => (
         <View
           key={index}
           style={{
@@ -476,7 +634,24 @@ function Scan({ tone, light }: { tone: Tone; light: number }) {
             backgroundColor: ink,
           }}
         />
-      ))}
+      )),
+    [lines, ink],
+  );
+
+  // Held across renders: a fresh interpolation every render is a fresh node in
+  // the native animation graph, created and dropped again each time.
+  const translateY = useMemo(
+    () =>
+      sweep.interpolate({
+        inputRange: [0, 1],
+        outputRange: [-SCAN_BAND, height],
+      }),
+    [sweep, height],
+  );
+
+  return (
+    <View style={[StyleSheet.absoluteFill, styles.clip]} pointerEvents="none">
+      {mask}
 
       <Animated.View
         style={{
@@ -528,70 +703,105 @@ const RAIN_STEP: Record<WaveSpeed, number> = {
 function Rain({ tone, speed }: { tone: Tone; speed: WaveSpeed }) {
   const { width, height } = useWindowDimensions();
   const [frame, setFrame] = useState(0);
+  const onScreen = useOnScreen();
 
   const step = RAIN_STEP[speed];
 
   useEffect(() => {
-    if (step === 0) return;
+    if (step === 0 || !onScreen) return;
     const timer = setInterval(() => setFrame((n) => n + 1), WAVE_FRAME_MS);
     return () => clearInterval(timer);
-  }, [step]);
+  }, [step, onScreen]);
 
   const columns = Math.floor(width / (RAIN_FONT * MONO_ASPECT));
   const rows = Math.ceil(height / RAIN_LINE);
 
   // Per column: how fast it falls and where it started. Seeded, so a column
   // keeps its character across renders instead of reshuffling every frame.
-  const streams = useMemo(
-    () =>
-      Array.from({ length: columns }, (_, column) => ({
-        rate: 0.45 + noise(column * 31 + 3) * 1.1,
-        offset: noise(column * 57 + 11) * (rows + RAIN_TRAIL),
-      })),
-    [columns, rows],
-  );
+  const streams = useMemo(() => {
+    const rate = new Float64Array(columns);
+    const offset = new Float64Array(columns);
 
-  const layers = useMemo(() => {
-    const head: string[] = [];
-    const near: string[] = [];
-    const far: string[] = [];
-    const span = rows + RAIN_TRAIL;
-    const drift = frame * step;
+    for (let column = 0; column < columns; column += 1) {
+      rate[column] = 0.45 + noise(column * 31 + 3) * 1.1;
+      offset[column] = noise(column * 57 + 11) * (rows + RAIN_TRAIL);
+    }
+
+    return { rate, offset };
+  }, [columns, rows]);
+
+  /*
+    Which glyph a cell shows depends on where the cell is and nothing else —
+    the tails travel over a fixed field of characters rather than drawing new
+    ones as they fall. Hashing it per frame meant eight thousand hashes a
+    second, on a phone, to arrive at a table that had not changed since the
+    screen was measured.
+  */
+  const glyphs = useMemo(() => {
+    const codes = new Uint16Array(rows * columns);
 
     for (let row = 0; row < rows; row += 1) {
-      let headLine = '';
-      let nearLine = '';
-      let farLine = '';
-
       for (let column = 0; column < columns; column += 1) {
-        const stream = streams[column];
-        const position = (stream.offset + drift * stream.rate) % span;
-        const behind = position - row;
-
-        if (behind < 0 || behind >= RAIN_TRAIL) {
-          headLine += ' ';
-          nearLine += ' ';
-          farLine += ' ';
-          continue;
-        }
-
         const index = Math.floor(
           noise(row * 733 + column * 29 + 5) * RAIN_CHARS.length,
         );
-        const character = RAIN_CHARS[index];
-
-        headLine += behind < 1 ? character : ' ';
-        nearLine += behind >= 1 && behind < RAIN_TRAIL * 0.35 ? character : ' ';
-        farLine += behind >= RAIN_TRAIL * 0.35 ? character : ' ';
+        codes[row * columns + column] = RAIN_CHARS.charCodeAt(index);
       }
-
-      head.push(headLine);
-      near.push(nearLine);
-      far.push(farLine);
     }
 
-    return { head, near, far };
-  }, [rows, columns, streams, frame, step]);
+    return codes;
+  }, [rows, columns]);
+
+  const buffers = useMemo(
+    () => ({
+      head: screenBuffer(rows, columns),
+      near: screenBuffer(rows, columns),
+      far: screenBuffer(rows, columns),
+    }),
+    [rows, columns],
+  );
+
+  const layers = useMemo(() => {
+    const { head, near, far } = buffers;
+    const span = rows + RAIN_TRAIL;
+    const stride = columns + 1;
+    const nearLimit = RAIN_TRAIL * 0.35;
+    const drift = frame * step;
+
+    blank(head, rows, columns);
+    blank(near, rows, columns);
+    blank(far, rows, columns);
+
+    for (let column = 0; column < columns; column += 1) {
+      const position =
+        (streams.offset[column] + drift * streams.rate[column]) % span;
+
+      /*
+        Only the rows a tail actually covers get touched; everything else is
+        the blank above. Walking every cell of every layer instead spent three
+        quarters of the loop deciding to write a space — seven thousand of
+        them a frame on a phone, twenty-four thousand on a tablet.
+      */
+      const first = Math.max(0, Math.floor(position - RAIN_TRAIL) + 1);
+      const last = Math.min(rows - 1, Math.floor(position));
+
+      for (let row = first; row <= last; row += 1) {
+        const behind = position - row;
+        const code = glyphs[row * columns + column];
+        const at = row * stride + column;
+
+        if (behind < 1) head[at] = code;
+        else if (behind < nearLimit) near[at] = code;
+        else far[at] = code;
+      }
+    }
+
+    return {
+      head: textFrom(head),
+      near: textFrom(near),
+      far: textFrom(far),
+    };
+  }, [buffers, glyphs, streams, rows, columns, frame, step]);
 
   const sheet = {
     fontFamily: mono,
@@ -605,7 +815,7 @@ function Rain({ tone, speed }: { tone: Tone; speed: WaveSpeed }) {
         allowFontScaling={false}
         style={{ ...sheet, color: tone.color, opacity: 0.14 }}
       >
-        {layers.far.join('\n')}
+        {layers.far}
       </Text>
       <Text
         allowFontScaling={false}
@@ -614,7 +824,7 @@ function Rain({ tone, speed }: { tone: Tone; speed: WaveSpeed }) {
           { ...sheet, color: tone.color, opacity: 0.32 },
         ]}
       >
-        {layers.near.join('\n')}
+        {layers.near}
       </Text>
       <Text
         allowFontScaling={false}
@@ -623,7 +833,7 @@ function Rain({ tone, speed }: { tone: Tone; speed: WaveSpeed }) {
           { ...sheet, color: '#FFFFFF', opacity: 0.55 },
         ]}
       >
-        {layers.head.join('\n')}
+        {layers.head}
       </Text>
     </View>
   );

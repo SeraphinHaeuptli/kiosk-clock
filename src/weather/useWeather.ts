@@ -99,14 +99,32 @@ async function resolvePlace(query: string): Promise<Fetched<Place>> {
   const pending = inFlight.get(key);
   if (pending) return pending;
 
-  const request = fetchPlace(query).then((found) => {
-    inFlight.delete(key);
-    if (found.ok) {
-      memo = { query, place: found.value };
-      placeSlot.save(memo);
-    }
-    return found;
-  });
+  /**
+   * The failure is turned into an answer before the entry is cleared, so the
+   * map cannot be left holding a rejected promise.
+   *
+   * `fetchPlace` reports its own failures rather than throwing, but it does
+   * build a URL out of whatever was typed into the location field, and
+   * encoding that can throw on text a keyboard is capable of producing. When
+   * it did, the dead promise stayed in the map under that name: every later
+   * attempt at the same place was handed it back, nothing ever resolved, and
+   * the settings screen sat on "resolving" until the app was restarted.
+   */
+  const request = fetchPlace(query)
+    .catch(
+      (error: unknown): Fetched<Place> => ({
+        ok: false,
+        reason: error instanceof Error ? error.message : 'lookup failed',
+      }),
+    )
+    .then((found) => {
+      inFlight.delete(key);
+      if (found.ok) {
+        memo = { query, place: found.value };
+        placeSlot.save(memo);
+      }
+      return found;
+    });
 
   inFlight.set(key, request);
   return request;
