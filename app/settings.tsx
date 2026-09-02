@@ -1,5 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -493,7 +501,13 @@ export default function SettingsScreen() {
         />
         <CheckRow
           title="system bars"
-          hint="keeps Android's status and navigation bars on screen"
+          // iOS has no navigation bar to keep, and promising one would be a
+          // switch that half works. The toggle still earns its place there:
+          // the status bar is the half an iPhone has.
+          hint={Platform.select({
+            ios: 'keeps the status bar on screen',
+            default: "keeps Android's status and navigation bars on screen",
+          })}
           checked={settings.showSystemBars}
           onChange={(showSystemBars) => update({ showSystemBars })}
           tone={tone}

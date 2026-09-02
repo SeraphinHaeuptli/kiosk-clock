@@ -146,6 +146,89 @@ instead of crashing the clock behind it.
 
 ---
 
+## Running it on an iPhone
+
+The app is built for Android and sold there, but nothing about it is
+Android-only: the JS bundle already builds for iOS on every `npm run
+bundle`, and every native dependency either supports iOS or is guarded so
+its absence degrades one control instead of crashing the clock.
+
+Three routes, cheapest first.
+
+### 1. Expo Go — free, today, no Mac
+
+On any computer on the same network as the phone:
+
+```sh
+git clone https://github.com/SeraphinHaeuptli/kiosk-clock
+cd kiosk-clock
+npm ci
+npx expo start
+```
+
+Install Expo Go from the App Store and scan the QR code.
+
+This covers nearly all of the app: every face, every backdrop, the hue
+rail, all of settings, weather, the battery gauge, night dimming, presets.
+It does not cover device volume (the native module is not in Expo Go, so
+the bar reads "volume unavailable") or device now-playing, which is
+Android-only on any build. Both degrade rather than fail.
+
+### 2. EAS Build — a real app, no Mac, costs money
+
+```sh
+npm i -g eas-cli
+eas login
+eas device:create                # register the iPhone's UDID
+eas build --platform ios --profile preview
+```
+
+EAS builds on its own macOS machines and hands back an install URL to open
+on the phone. The `preview` profile is `distribution: internal`, which for
+iOS means an ad-hoc build — and ad-hoc signing requires an **Apple
+Developer Program membership (99 USD/year)**. There is no way around that
+one: a free Apple ID cannot produce a build that installs on a device from
+a cloud builder.
+
+### 3. A Mac
+
+```sh
+npx expo run:ios --device       # a free Apple ID works; certificates last 7 days
+npx expo run:ios                # simulator, free and unlimited
+```
+
+`eas build --platform ios --profile simulator` builds a simulator `.app`
+without any Apple account at all, but a simulator still needs a Mac to run
+in.
+
+### So: no free standalone app on a physical iPhone without a Mac
+
+Ad-hoc signing needs a paid Apple team; free personal signing needs Xcode.
+Expo Go is the free route and it does run on the phone — it is just not a
+separate icon on the home screen.
+
+### What differs on iOS
+
+- **Now playing reads nothing from the device.** iOS exposes no public API
+  for another app's session, for the reasons above. The endpoint is the
+  only source, and the transport keys stay hidden because there is nothing
+  to drive.
+- **The system bars toggle is half a toggle.** There is no navigation bar
+  on iOS, so it governs the status bar alone; the settings hint says so on
+  iOS and names both bars on Android.
+- **Volume may not be settable.** `react-native-volume-manager` ships iOS
+  code and reading works, but iOS restricts setting system volume
+  programmatically. Untested on a device.
+- **Purchases are Play-only.** `src/billing/playBilling.ts` talks to Google
+  Play Billing; shipping on the App Store would mean StoreKit. Irrelevant
+  for testing, since the founder pack has a test path.
+- **iPad stays full screen.** `ios.requireFullScreen` is set, because an
+  iPad app that keeps Slide Over and Split View cannot hold an orientation
+  lock — and a kiosk clock sharing the screen with a browser is not a
+  kiosk.
+
+---
+
 ## Security posture
 
 What this app can reach, and what it deliberately cannot.
