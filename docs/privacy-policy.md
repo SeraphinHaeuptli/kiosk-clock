@@ -109,9 +109,19 @@ yourself: the only `fetch` calls in the whole codebase are in
 
 ---
 
-## Notification access on Android — what it is for and what it is not
+## Notification access on Android — not in this version
 
-This is the one genuinely powerful permission Kiosk can hold, so it is worth
+**This release does not contain the notification listener at all.** It is
+excluded from the build, so the service is absent from the installed app,
+Android will not offer Kiosk in its Notification Access list, and nothing
+below can happen in the version you have. Now playing reads only from an
+endpoint you configure yourself.
+
+The rest of this section describes the feature as it is written, and is kept
+because it is the accurate account of what the capability would do if a later
+version ships it. Treat it as a statement of intent, not of current behaviour.
+
+This is the one genuinely powerful permission Kiosk could hold, so it is worth
 being exact about.
 
 **What Android is actually granting.** To read what is playing on your device,
@@ -165,17 +175,31 @@ time in Android Settings → Apps → Special app access → Notification access
 
 ## Permissions
 
-Kiosk declares two Android permissions and no others:
+Kiosk declares four Android permissions and no others. None of them prompts:
+all four are granted at install, because none is in a dangerous group.
 
 - `INTERNET` — for the three optional requests described above.
 - `VIBRATE` — for the small haptic tick as the volume bar crosses each cell.
+- `com.android.vending.BILLING` — to sell the Founder pack through Google
+  Play. Play requires a digital unlock inside a Play-distributed app to be
+  sold this way.
+- `ACCESS_NETWORK_STATE` — required by Google's billing library, which checks
+  for a connection before calling the store. It reveals whether the device has
+  one, not what is on it or where it goes.
+
+A fifth entry appears in the manifest,
+`com.kioskclock.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`. It is added by
+AndroidX, is scoped to this app's own signature, and can be held by nothing
+that is not signed with the same key. It guards Kiosk's own internal
+broadcasts and grants no access to anything on your device.
 
 Three permissions that Expo's project template ships by default —
 `SYSTEM_ALERT_WINDOW` (draw over other apps) and the two external-storage
 permissions — are explicitly removed from the release manifest.
 
-Notification Access, described above, is not a manifest permission; it is a
-special access you grant in system settings and can withdraw there.
+Notification Access is not a manifest permission; it is a special access
+granted in system settings. **This version does not ask for it and cannot
+use it** — see the section above.
 
 ## In-app purchase
 

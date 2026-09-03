@@ -24,6 +24,17 @@ const ALLOWED = new Map([
   ['android.permission.INTERNET', 'weather and the optional now-playing endpoint'],
   ['android.permission.VIBRATE', 'the haptic tick on the volume bar'],
   [
+    'android.permission.ACCESS_NETWORK_STATE',
+    'the Play Billing library, which checks connectivity before a store call.' +
+      ' Contributed transitively — openiap-google declares only BILLING and' +
+      ' INTERNET, and this appeared in the merged manifest the moment expo-iap' +
+      ' arrived. A normal permission: granted at install, no prompt, and it' +
+      ' reveals whether there is a connection, not anything about it. Left in' +
+      ' rather than blocked because getActiveNetworkInfo throws without it,' +
+      ' and silently breaking payments to drop a promptless permission is a' +
+      ' bad trade.',
+  ],
+  [
     'com.android.vending.BILLING',
     'Google Play Billing, for the one-off founder pack. Contributed by' +
       " expo-iap's own manifest, not requested here, and the only way Play" +

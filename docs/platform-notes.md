@@ -233,7 +233,11 @@ separate icon on the home screen.
 
 What this app can reach, and what it deliberately cannot.
 
-**Permissions.** `INTERNET` and `VIBRATE`, and that is all. Expo's template
+**Permissions.** `INTERNET`, `VIBRATE`, and two that arrived with billing:
+`com.android.vending.BILLING`, and `ACCESS_NETWORK_STATE`, which Google's
+billing library uses to check for a connection before calling the store. None
+of the four prompts. All four are asserted against the merged manifest on
+every build, so a dependency cannot add a fifth quietly. Expo's template
 ships `SYSTEM_ALERT_WINDOW` and the two external-storage permissions under a
 comment reading "OPTIONAL PERMISSIONS, REMOVE WHATEVER YOU DO NOT NEED";
 nothing here needs them, and draw-over-other-apps in particular is the
