@@ -123,11 +123,13 @@ const WEATHER_HINT =
   'forecast by the norwegian meteorological institute (met.no), places by ' +
   'openstreetmap nominatim, both under cc by 4.0.';
 
+// Says only what this build does. Reading the device's own media session is
+// written and works, but its notification listener is excluded from v1, so
+// describing it here would promise a capability the installed app does not
+// have.
 const AUDIO_HINT =
-  'android reads the device media session directly once notification access ' +
-  'is granted. the endpoint is the fallback, and the only option on ios: any ' +
-  'url returning {"title":"...","artist":"...","playing":true}, such as a ' +
-  'playerctl or mpris wrapper on the machine doing the playing.';
+  'point it at any url returning {"title":"...","artist":"...","playing":true}' +
+  ' — such as a playerctl or mpris wrapper on the machine doing the playing.';
 
 /** "22:00" from a bare hour. */
 function hourLabel(hour: number): string {

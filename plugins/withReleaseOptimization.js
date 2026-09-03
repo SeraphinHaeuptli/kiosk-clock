@@ -127,6 +127,11 @@ ${RULES_BEGIN}
 # on its own; this says so explicitly rather than depending on that inference,
 # because losing it would silently disable notification access and with it the
 # whole now-playing feature.
+#
+# Inert in v1, which excludes the module from the build (see
+# expo.autolinking.exclude in package.json): R8 ignores a keep rule naming a
+# class it cannot find. Left in place so the rule is already correct when the
+# device source ships, rather than being something to remember.
 -keep class expo.modules.nowplaying.KioskNotificationListener { *; }
 -keep class expo.modules.nowplaying.NowPlayingModule { *; }
 

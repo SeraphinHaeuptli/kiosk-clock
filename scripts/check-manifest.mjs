@@ -33,11 +33,29 @@ const ALLOWED = new Map([
 
 /** Things that must be present, not merely permitted. */
 const REQUIRED_STRINGS = [
-  // The listener service has to survive the merge or notification access, and
-  // with it the whole now-playing feature, silently stops working.
+  ['android:allowBackup="false"', 'backups staying off'],
+];
+
+/**
+ * Things that must NOT be present.
+ *
+ * v1 reads now playing from the configured endpoint only. The device-session
+ * half works and stays in the tree, but its notification listener is excluded
+ * from the build in package.json under `expo.autolinking.exclude`.
+ *
+ * The exclusion is asserted here, against the merged manifest, because that is
+ * the only place it counts: Play generates the sensitive-permission
+ * declaration from the uploaded bundle, so a listener that is declared but
+ * never called would draw the policy review and return nothing for it. Half a
+ * feature and all of the risk is the one combination worth failing a build
+ * over.
+ *
+ * To ship it in v1.1: drop the exclusion from package.json and move these two
+ * lines back into REQUIRED_STRINGS.
+ */
+const FORBIDDEN_STRINGS = [
   ['expo.modules.nowplaying.KioskNotificationListener', 'the notification listener service'],
   ['android.permission.BIND_NOTIFICATION_LISTENER_SERVICE', 'the system-only bind permission guarding it'],
-  ['android:allowBackup="false"', 'backups staying off'],
 ];
 
 function findManifests(dir) {
@@ -103,6 +121,17 @@ for (const path of manifests) {
     if (!xml.includes(needle)) {
       failed = true;
       console.error(`  MISSING: ${what} (${needle})`);
+    }
+  }
+
+  for (const [needle, what] of FORBIDDEN_STRINGS) {
+    if (xml.includes(needle)) {
+      failed = true;
+      console.error(
+        `  PRESENT and must not be: ${what} (${needle})\n` +
+          '  v1 ships the endpoint source only. If this is deliberate, see the\n' +
+          '  note above FORBIDDEN_STRINGS for the two lines to change.',
+      );
     }
   }
 }

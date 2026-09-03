@@ -48,7 +48,9 @@
   "private": true,
   "expo": {
     "autolinking": {
-      "nativeModulesDir": "./modules"
+      "exclude": [
+        "now-playing"
+      ]
     }
   }
 }
