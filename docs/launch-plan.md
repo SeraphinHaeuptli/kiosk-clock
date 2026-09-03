@@ -10,9 +10,15 @@ text and images are in `../store/`.
 
 ---
 
-## Two decisions to make first
+## Two decisions, now made
 
-Both change the critical path. Neither can be made for you.
+Both changed the critical path. The reasoning behind each is kept below, since
+the second one gets revisited at v1.1.
+
+| | Decision |
+|---|---|
+| Media session | **Endpoint source only in v1.** The listener is excluded from the build in `package.json` under `expo.autolinking.exclude`, and `check:manifest` fails the build if it reappears. |
+| Founder pack | **Sold in v1.** `expo-iap` is wired up and `activeBilling` points at the Play adapter. Untested against a real product — see below. |
 
 ### 1. Does v1 read the device media session?
 
@@ -31,12 +37,16 @@ true, defensible, and has to be made to a human reviewer.
 No first-hand report of a media-metadata listener passing or failing Play
 review could be found either way. That absence is itself the finding.
 
-**Recommendation: ship v1 with the endpoint source only.** The feature stays in
-the listing, the code stays in the tree behind its existing source selection,
-and the device-session half arrives in v1.1 — where a policy rejection costs a
-release rather than your first launch and the fourteen-day testing gate you
-will already have cleared. This is not dropping a feature; it is not
-serialising a policy review in front of a launch.
+**Decided: endpoint source only.** Note the implementation detail, because the
+obvious version of this does not work: Play generates the sensitive-permission
+declaration from the uploaded bundle, so leaving the listener declared and
+merely not calling it draws the policy review *and* returns nothing for it.
+The module is excluded from the build instead. Nothing is deleted — v1.1 drops
+the exclusion and moves two lines in `check-manifest.mjs` back.
+
+The listing must not promise reading the device's own media session in v1.
+The in-app settings hint has already been corrected to describe the endpoint
+alone.
 
 ### 2. Does v1 sell the Founder pack?
 
@@ -57,8 +67,16 @@ Three options:
 - **Ship the pack unlocked and honest.** Everything free, no purchase in the
   listing, sell later.
 
-**Recommendation: free v1.** Get an app live, clear production access, build
-account history — then monetise into an audience that exists.
+**Decided: sell it in v1.** `expo-iap` is installed and the adapter in
+`src/billing/playBilling.ts` is written against it: acknowledgement from
+`load()` as well as `purchase()`, pending purchases granted nothing, and the
+store's own localised price string. It wraps Play Billing Library 9.1, past
+the 8.0 floor enforced from 31 August 2026.
+
+**None of it has run against Play**, and it cannot until the product exists on
+a track and the account is a licence tester. Step 4a below is where it first
+becomes testable, and until it passes there the app can take money in exactly
+the way nobody has checked.
 
 ---
 
@@ -92,6 +110,11 @@ Not done, and blocking:
    anywhere in the listing.
 5. **The closed test has not started.** This is the long pole: 12 testers,
    14 continuous days.
+6. **Billing is written but unverified.** No purchase has ever completed. The
+   three paths that must be walked by a licence tester before production:
+   buy; kill the app between paying and acknowledging, then relaunch and
+   confirm the pack is still there; uninstall, reinstall, and confirm
+   `restore` gives it back.
 
 ---
 
@@ -105,6 +128,7 @@ Times are calendar, not effort. Steps 1–3 can overlap with 4–6.
 | 2 | Generate the upload key, add the four repo secrets, run the workflow, confirm the `.aab` is signed | you, 20 min | same day |
 | 3 | Publish the privacy policy to a URL | you, 20 min | same day |
 | 4 | Create the app in Console, upload the `.aab` to **internal testing**, install it on your own phone from the Play link | you | same day |
+| 4a | Create the managed product `founder_lifetime`, price it, activate it, add yourself under Setup → Licence testing, then walk the three billing paths listed above | you | same day |
 | 5 | **Look at App content → Sensitive app permissions.** The form is generated from your uploaded bundle. This is the cheapest possible answer to whether the notification listener triggers a declaration — minutes, free, before committing to anything | you | same day |
 | 6 | Fill the listing: images from `store/`, copy from `store/copy.md`, data safety, content rating, target audience, ads/news/government declarations | you, 2–3 h | same day |
 | 7 | Promote to **closed testing**. Recruit **15–18** testers, not 12 — the requirement is 12 opted in *continuously* and attrition is real | you | 1–3 days to recruit |

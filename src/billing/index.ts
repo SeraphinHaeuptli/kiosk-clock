@@ -11,19 +11,23 @@ import type { BillingPort } from './port';
 import { testBilling } from './testBilling';
 
 /**
- * Switch to `playBilling` once the steps in playBilling.ts are done.
+ * The Play adapter, as of the decision to sell the pack in v1.
  *
- * This must not be flipped by a runtime check or an environment variable: a
- * build either has the native billing module in it or it does not, and a
- * shipped app that can fall back to the test port is a shipped app that gives
- * the pack away.
+ * Deliberately not chosen by a runtime check or an environment variable, and
+ * not by `__DEV__` either: a build either has the native billing module in it
+ * or it does not, and a shipped app that can fall back to the test port is a
+ * shipped app that gives the pack away. Developing against the fake store
+ * means editing this line, which is the point — it is one line, in one place,
+ * and it shows up in a diff.
  */
-export const activeBilling: BillingPort = testBilling;
+export const activeBilling: BillingPort = playBilling;
 
-// A release build carrying the fake store gives the pack away to everyone who
-// installs it. The purchase screen says so on its face, but that only helps
-// someone who opens it; this fires once at startup where the person who built
-// the thing will see it.
+// Kept pointing the other way now that Play is live: this fires if the line
+// above is ever switched back for local work and the change escapes into a
+// release. A release build carrying the fake store gives the pack away to
+// everyone who installs it. The purchase screen says so on its face, but that
+// only helps someone who opens it; this fires once at startup where the person
+// who built the thing will see it.
 if (!__DEV__ && activeBilling.kind === 'test') {
   console.warn(
     'kiosk: built with the test billing port — the founder pack unlocks for ' +

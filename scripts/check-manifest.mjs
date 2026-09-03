@@ -24,6 +24,12 @@ const ALLOWED = new Map([
   ['android.permission.INTERNET', 'weather and the optional now-playing endpoint'],
   ['android.permission.VIBRATE', 'the haptic tick on the volume bar'],
   [
+    'com.android.vending.BILLING',
+    'Google Play Billing, for the one-off founder pack. Contributed by' +
+      " expo-iap's own manifest, not requested here, and the only way Play" +
+      ' permits a digital unlock inside a Play-distributed app to be sold.',
+  ],
+  [
     'com.kioskclock.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION',
     'AndroidX, targeting API 33+ — a signature permission scoped to this app,' +
       ' guarding its own dynamically registered receivers. Not user-facing and' +

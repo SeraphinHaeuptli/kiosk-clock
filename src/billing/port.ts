@@ -16,6 +16,15 @@ export type PurchaseOutcome =
   | { status: 'owned'; entitlements: readonly Entitlement[] }
   /** The user backed out of the store's own sheet. Not an error. */
   | { status: 'cancelled' }
+  /**
+   * Play took the order but the money has not arrived — cash at a kiosk, or
+   * carrier billing, which can take days.
+   *
+   * Its own case because it is neither of the two it would otherwise be
+   * squeezed into: nothing failed, and nothing is owned yet. Granting on it
+   * gives the pack away to anyone who starts a payment they never complete.
+   */
+  | { status: 'pending'; reason: string }
   | { status: 'unavailable'; reason: string }
   | { status: 'failed'; reason: string };
 
