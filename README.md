@@ -268,3 +268,37 @@ places by [Nominatim](https://nominatim.openstreetmap.org/) · both CC BY 4.0
 
 </sub>
 </div>
+
+---
+
+## Licence
+
+Copyright © 2026 SeraphinHaeuptli
+
+Kiosk is free software: you can redistribute it and/or modify it under the
+terms of the **GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version**. The full text is in [`LICENSE`](LICENSE).
+
+It is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+### Additional permission under GNU GPL version 3 section 7
+
+The Play Store build links against Google's Play Billing Library, which is
+proprietary. The GPL does not permit combining covered code with a non-free
+library unless the copyright holder says so, and this says so:
+
+> If you modify this Program, or any covered work, by linking or combining it
+> with the Google Play Billing Library (or a modified version of that
+> library), containing parts covered by the terms of the Android Software
+> Development Kit License Agreement, the licensors of this Program grant you
+> additional permission to convey the resulting work.
+
+Without this, nobody — including anyone who forks Kiosk — could distribute a
+build that can take payments. It applies only to that one library.
+
+The F-Droid build does not need it: `expo-iap` and the billing library are
+excluded from that build entirely, so it links against nothing non-free. See
+[`docs/fdroid.md`](docs/fdroid.md).
