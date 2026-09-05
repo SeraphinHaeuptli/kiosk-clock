@@ -39,7 +39,7 @@ export interface BillingPort {
    * labelling test purchases as test purchases, so a build with the fake
    * store can never be mistaken for a real one.
    */
-  readonly kind: 'test' | 'play';
+  readonly kind: 'test' | 'play' | 'free';
 
   /** Entitlements already held, read at startup. Never throws. */
   load(): Promise<readonly Entitlement[]>;

@@ -11,11 +11,12 @@ import {
 
 import { activeBilling } from './index';
 import type { Entitlement } from './catalog';
-import type { Offer, PurchaseOutcome } from './port';
+import type { BillingPort, Offer, PurchaseOutcome } from './port';
 
 interface BillingValue {
   /** Which store answered. 'test' means no money changed hands. */
-  kind: 'test' | 'play';
+  /** Taken from the port rather than restated, so the two cannot drift. */
+  kind: BillingPort['kind'];
   /**
    * False until the stored entitlement has been read.
    *
