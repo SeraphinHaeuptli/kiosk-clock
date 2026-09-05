@@ -25,8 +25,8 @@
  * side agrees with the native side:
  *
  *   node scripts/prepare-storeless.mjs
- *   KIOSK_STORE=none npx expo prebuild --platform android --no-install
- *   KIOSK_STORE=none ./gradlew assembleRelease
+ *   EXPO_PUBLIC_KIOSK_STORE=none npx expo prebuild --platform android --no-install
+ *   EXPO_PUBLIC_KIOSK_STORE=none ./gradlew assembleRelease
  *
  * Idempotent, and it prints what it changed.
  */
@@ -50,4 +50,4 @@ if (exclude.includes(STORELESS)) {
 }
 
 console.log(`exclusions now: ${pkg.expo.autolinking.exclude.join(', ')}`);
-console.log('remember: KIOSK_STORE=none for prebuild and the gradle build');
+console.log('remember: EXPO_PUBLIC_KIOSK_STORE=none for prebuild and the gradle build');

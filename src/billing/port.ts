@@ -39,7 +39,7 @@ export interface BillingPort {
    * labelling test purchases as test purchases, so a build with the fake
    * store can never be mistaken for a real one.
    */
-  readonly kind: 'test' | 'play' | 'free';
+  readonly kind: 'test' | 'play' | 'free' | 'licence';
 
   /** Entitlements already held, read at startup. Never throws. */
   load(): Promise<readonly Entitlement[]>;
@@ -65,4 +65,13 @@ export interface BillingPort {
    * it when `kind` is 'test'.
    */
   revoke?(): Promise<void>;
+
+  /**
+   * Take a key someone was given after paying, and say whether it was real.
+   *
+   * Only the licence port implements this. A store that knows who is signed in
+   * has no use for it: Play already knows what the account bought, which is
+   * why `restore` exists there and this does not.
+   */
+  redeem?(key: string): Promise<boolean>;
 }

@@ -27,7 +27,7 @@ const ROOT = 'android/app/build/intermediates/merged_manifests';
  * variants — that the app can be paid for, or that the proprietary library is
  * genuinely absent rather than merely unused.
  */
-const STORELESS = process.env.KIOSK_STORE === 'none';
+const STORELESS = process.env.EXPO_PUBLIC_KIOSK_STORE === 'none';
 
 /** Everything the app is allowed to ask for, and why. Also: required. */
 const ALLOWED = new Map([

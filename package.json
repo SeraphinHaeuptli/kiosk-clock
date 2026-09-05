@@ -5,6 +5,8 @@
   "dependencies": {
     "@expo-google-fonts/jetbrains-mono": "^0.4.1",
     "@expo/metro-runtime": "~57.0.14",
+    "@noble/ed25519": "^3.2.0",
+    "@noble/hashes": "^2.4.0",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~57.0.17",
     "expo-battery": "~57.0.2",

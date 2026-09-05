@@ -135,7 +135,7 @@ jobs:
       - name: Generate the native project
         env:
           KIOSK_VERSION_CODE: ${{ github.run_number }}
-          KIOSK_STORE: ${{ steps.variant.outputs.store }}
+          EXPO_PUBLIC_KIOSK_STORE: ${{ steps.variant.outputs.store }}
         run: npx expo prebuild --platform android --no-install
 
       # Passed as ORG_GRADLE_PROJECT_* environment variables rather than -P
@@ -143,7 +143,7 @@ jobs:
       - name: Build the bundle and the APK
         working-directory: android
         env:
-          KIOSK_STORE: ${{ steps.variant.outputs.store }}
+          EXPO_PUBLIC_KIOSK_STORE: ${{ steps.variant.outputs.store }}
           ORG_GRADLE_PROJECT_KIOSK_UPLOAD_STORE_FILE: ${{ steps.signing.outputs.present == 'true' && format('{0}/upload.jks', runner.temp) || '' }}
           ORG_GRADLE_PROJECT_KIOSK_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ORG_GRADLE_PROJECT_KIOSK_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -155,7 +155,7 @@ jobs:
       # without a single line of this repo changing.
       - name: Check the shipped permission surface
         env:
-          KIOSK_STORE: ${{ steps.variant.outputs.store }}
+          EXPO_PUBLIC_KIOSK_STORE: ${{ steps.variant.outputs.store }}
         run: npm run check:manifest
 
       - name: Report what was built

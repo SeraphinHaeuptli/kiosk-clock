@@ -34,6 +34,8 @@ interface BillingValue {
   restore: () => Promise<boolean>;
   /** Present only on the test port; the purchase screen hides it otherwise. */
   revoke: (() => Promise<void>) | null;
+  /** Takes a key bought outside the app. Null where the port has no such idea. */
+  redeem: ((key: string) => Promise<boolean>) | null;
 }
 
 const BillingContext = createContext<BillingValue | null>(null);
@@ -131,6 +133,20 @@ export function BillingProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /**
+   * Mirrors `revoke`: absent unless the active port has it, so the screen can
+   * ask whether redeeming is a thing this build does rather than being told.
+   */
+  const redeem = useMemo(() => {
+    const take = activeBilling.redeem;
+    if (!take) return null;
+    return async (key: string) => {
+      const accepted = await take.call(activeBilling, key);
+      if (accepted && mounted.current) setFounder(true);
+      return accepted;
+    };
+  }, []);
+
   const revoke = useMemo(() => {
     const give = activeBilling.revoke;
     if (!give) return null;
@@ -150,8 +166,9 @@ export function BillingProvider({ children }: { children: ReactNode }) {
       purchase,
       restore,
       revoke,
+      redeem,
     }),
-    [ready, founder, offer, busy, purchase, restore, revoke],
+    [ready, founder, offer, busy, purchase, restore, revoke, redeem],
   );
 
   return (

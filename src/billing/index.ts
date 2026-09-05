@@ -6,20 +6,24 @@
  * is the whole of the change.
  */
 
-import Constants from 'expo-constants';
-
 import { freeBilling } from './freeBilling';
+import { licensingConfigured } from './licence';
+import { licenceBilling } from './licenceBilling';
 import { playBilling } from './playBilling';
 import type { BillingPort } from './port';
 import { testBilling } from './testBilling';
 
 /**
- * Which store this build was made for, baked in at build time by
- * app.config.js. Read rather than compared to an environment variable at
- * runtime: by the time this executes, `process.env` is long gone and the value
- * is a constant in the bundle.
+ * Which store this build was made for.
+ *
+ * An EXPO_PUBLIC_ variable because Metro substitutes those into the bundle as
+ * literals while it builds, on every platform. The obvious alternative,
+ * reading `extra` off the app config at runtime, is not equivalent: it is
+ * absent from the web bundle entirely, so a storeless web build silently came
+ * back as the Play build. It failed the same way it would have failed
+ * quietly on a phone — a locked app with nothing to unlock it.
  */
-const storeless = Constants.expoConfig?.extra?.store === 'none';
+const storeless = process.env.EXPO_PUBLIC_KIOSK_STORE === 'none';
 
 /**
  * The Play adapter, or the storeless one for builds that have no store.
@@ -35,7 +39,15 @@ const storeless = Constants.expoConfig?.extra?.store === 'none';
  * developing against the fake store means editing this line — one line, in one
  * place, and visible in a diff.
  */
-export const activeBilling: BillingPort = storeless ? freeBilling : playBilling;
+export const activeBilling: BillingPort = storeless
+  ? // A storeless build sells by signed key if one can be checked, and gives
+    // everything away if not. The fallback is deliberate: until a public key
+    // is pasted into licence.ts there is no way to buy, and an app that gates
+    // content it cannot sell is an app that only frustrates people.
+    licensingConfigured()
+    ? licenceBilling
+    : freeBilling
+  : playBilling;
 
 // Kept pointing the other way now that Play is live: this fires if the line
 // above is ever switched back for local work and the change escapes into a
@@ -50,7 +62,7 @@ if (!__DEV__ && activeBilling.kind === 'test') {
   );
 }
 
-export { freeBilling, playBilling, testBilling };
+export { freeBilling, licenceBilling, playBilling, testBilling };
 export type { BillingPort };
 export * from './catalog';
 export * from './port';

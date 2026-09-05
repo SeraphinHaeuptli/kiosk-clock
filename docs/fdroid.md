@@ -70,14 +70,14 @@ and neither can be driven by an environment variable.
 
 ```sh
 node scripts/prepare-storeless.mjs                              # native side
-KIOSK_STORE=none npx expo prebuild --platform android --no-install
-cd android && KIOSK_STORE=none ./gradlew assembleRelease
+EXPO_PUBLIC_KIOSK_STORE=none npx expo prebuild --platform android --no-install
+cd android && EXPO_PUBLIC_KIOSK_STORE=none ./gradlew assembleRelease
 ```
 
 - `scripts/prepare-storeless.mjs` adds `expo-iap` to `expo.autolinking.exclude`,
   so the generated Gradle project contains no billing library at all. It is
   idempotent and prints what it changed.
-- `KIOSK_STORE=none` makes `app.config.js` set `extra.store`, which selects
+- `EXPO_PUBLIC_KIOSK_STORE=none` makes `app.config.js` set `extra.store`, which selects
   `src/billing/freeBilling.ts` instead of the Play adapter. It fails closed:
   anything other than exactly `none` gives the paid build.
 

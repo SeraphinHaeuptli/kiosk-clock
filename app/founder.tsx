@@ -9,12 +9,17 @@ import { FOUNDER_BENEFITS } from '@/billing/catalog';
 import { useSettings } from '@/clock/SettingsContext';
 import { label, surface, withAlpha } from '@/design/palette';
 import { hairline, space, type } from '@/design/tokens';
-import { ActionRow, Heading, StatusRow } from '@/ui/Terminal';
+import { ActionRow, Heading, StatusRow, TextRow } from '@/ui/Terminal';
 
 const PITCH =
   'one payment, kept forever. no subscription, no account, and nothing to ' +
   'sign in to — the unlock lives on the device and restores from the store ' +
   'if you reinstall.';
+
+const KEY_NOTE =
+  'paid outside the app, so there is no account and nothing to sign in to. ' +
+  'your key arrives by email after paying; it works on every device you own ' +
+  'and keeps working with no connection.';
 
 const TEST_NOTE =
   'this build talks to a stand-in for the store: the unlock is written ' +
@@ -25,10 +30,23 @@ export default function FounderScreen() {
   const { tone } = useSettings();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { kind, founder, offer, busy, purchase, restore, revoke } =
+  const { kind, founder, offer, busy, purchase, restore, revoke, redeem } =
     useBilling();
 
   const [status, setStatus] = useState<string | null>(null);
+  const [key, setKey] = useState('');
+
+  const useKey = async () => {
+    setStatus(null);
+    if (!redeem) return;
+    if (await redeem(key)) {
+      setKey('');
+      setStatus('unlocked. thank you.');
+    } else {
+      // Deliberately says nothing about which part was wrong.
+      setStatus('that key was not accepted.');
+    }
+  };
 
   const buy = async () => {
     setStatus(null);
@@ -51,7 +69,9 @@ export default function FounderScreen() {
     setStatus(
       (await restore())
         ? 'found it — unlocked.'
-        : 'no earlier purchase found on this account.',
+        : redeem
+          ? 'nothing stored on this device. paste your key below.'
+          : 'no earlier purchase found on this account.',
     );
   };
 
@@ -120,6 +140,21 @@ export default function FounderScreen() {
             </Pressable>
 
             <ActionRow title="restore a previous purchase" onPress={bringBack} />
+
+            {redeem && (
+              <>
+                <Heading>already bought it?</Heading>
+                <TextRow
+                  title="founder key"
+                  value={key}
+                  placeholder="KIOSK-..."
+                  onChangeText={setKey}
+                  kind="text"
+                />
+                <ActionRow title="use this key" onPress={useKey} />
+                <Text style={styles.note}>{KEY_NOTE}</Text>
+              </>
+            )}
           </>
         )}
 
