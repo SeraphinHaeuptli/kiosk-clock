@@ -75,6 +75,12 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Cheap, and guards the quietest failure this project has: if the key
+      # format in the app and the one in server/ ever drift, every key sold is
+      # rejected by the app and nothing else notices.
+      - name: Check the key format still round-trips
+        run: npm run test:mint
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

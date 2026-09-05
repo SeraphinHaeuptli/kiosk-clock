@@ -72,26 +72,23 @@ one is needed only to turn a payment into a key.
 
 ### 3. Turn payments into keys
 
-A webhook on `checkout.session.completed`, doing what
-`scripts/make-licence-key.mjs --sign` does:
+Written already: `server/mint.mjs`, with deployment in
+[`server/README.md`](../server/README.md). It is one `fetch` handler that
+Stripe redirects to after payment — it asks Stripe whether the session really
+was paid, signs a key, and shows it on a page the buyer copies from.
 
-```
-payload  = [1] ++ sha512(session.id)[0..16] ++ now_ms_as_6_bytes
-signature = ed25519_sign(payload, PRIVATE_KEY)
-key      = "KIOSK-" ++ base64url(payload ++ signature)
-```
+No webhook and no email provider. The key is derived from the checkout id, so
+re-opening the page shows the same key and a lost one costs a back button
+rather than a support conversation.
 
-Then email it to `session.customer_details.email`. The signing script is forty
-lines and is the reference implementation; a serverless function is plenty.
-
-**Verify the Stripe webhook signature before signing anything.** An unverified
-endpoint that mints keys on request is an endpoint that mints keys for anyone
-who finds it.
+`npm run test:mint` checks that the server and the app still agree about the
+format. CI runs it, because drift there would reject every key ever sold and
+nothing else would notice.
 
 ### 4. Check it end to end
 
-Stripe test mode, a real card number from their test set, and confirm the
-emailed key unlocks a build with your public key in it.
+Stripe test mode, a card number from their test set, and confirm the key on
+the redirect page unlocks a build carrying your public key.
 
 ---
 
