@@ -57,19 +57,24 @@ audience actually matches this app.
 
 ---
 
-## Building the F-Droid variant
+## Building the storeless variant
+
+This is the same build the sideload APK uses, for the same reason: a
+sideloaded app cannot reach Play Billing either — purchases only work for apps
+Play itself installed — so both need the store taken out. CI builds it by
+default; `store: play` has to be asked for explicitly.
 
 Two things have to change together, and they are separate mechanisms because
 autolinking reads its exclusions from `package.json` or a command-line flag,
 and neither can be driven by an environment variable.
 
 ```sh
-node scripts/fdroid-prepare.mjs                              # native side
+node scripts/prepare-storeless.mjs                              # native side
 KIOSK_STORE=none npx expo prebuild --platform android --no-install
 cd android && KIOSK_STORE=none ./gradlew assembleRelease
 ```
 
-- `scripts/fdroid-prepare.mjs` adds `expo-iap` to `expo.autolinking.exclude`,
+- `scripts/prepare-storeless.mjs` adds `expo-iap` to `expo.autolinking.exclude`,
   so the generated Gradle project contains no billing library at all. It is
   idempotent and prints what it changed.
 - `KIOSK_STORE=none` makes `app.config.js` set `extra.store`, which selects

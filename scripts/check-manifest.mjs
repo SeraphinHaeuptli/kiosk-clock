@@ -19,10 +19,34 @@ import { join } from 'node:path';
 
 const ROOT = 'android/app/build/intermediates/merged_manifests';
 
-/** Everything the app is allowed to ask for, and why. */
+/**
+ * Which build this is checking.
+ *
+ * The two billing permissions are required in the Play build and forbidden in
+ * the storeless one, so the same check proves opposite things about the two
+ * variants — that the app can be paid for, or that the proprietary library is
+ * genuinely absent rather than merely unused.
+ */
+const STORELESS = process.env.KIOSK_STORE === 'none';
+
+/** Everything the app is allowed to ask for, and why. Also: required. */
 const ALLOWED = new Map([
   ['android.permission.INTERNET', 'weather and the optional now-playing endpoint'],
   ['android.permission.VIBRATE', 'the haptic tick on the volume bar'],
+  [
+    'com.kioskclock.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION',
+    'AndroidX, targeting API 33+ — a signature permission scoped to this app,' +
+      ' guarding its own dynamically registered receivers. Not user-facing and' +
+      ' not grantable to anything not signed with the same key.',
+  ],
+]);
+
+/** Things that must be present, not merely permitted. */
+const REQUIRED_STRINGS = [
+  ['android:allowBackup="false"', 'backups staying off'],
+];
+
+const BILLING = new Map([
   [
     'android.permission.ACCESS_NETWORK_STATE',
     'the Play Billing library, which checks connectivity before a store call.' +
@@ -40,18 +64,9 @@ const ALLOWED = new Map([
       " expo-iap's own manifest, not requested here, and the only way Play" +
       ' permits a digital unlock inside a Play-distributed app to be sold.',
   ],
-  [
-    'com.kioskclock.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION',
-    'AndroidX, targeting API 33+ — a signature permission scoped to this app,' +
-      ' guarding its own dynamically registered receivers. Not user-facing and' +
-      ' not grantable to anything not signed with the same key.',
-  ],
 ]);
 
-/** Things that must be present, not merely permitted. */
-const REQUIRED_STRINGS = [
-  ['android:allowBackup="false"', 'backups staying off'],
-];
+if (!STORELESS) for (const [name, why] of BILLING) ALLOWED.set(name, why);
 
 /**
  * Things that must NOT be present.
@@ -74,6 +89,14 @@ const FORBIDDEN_STRINGS = [
   ['expo.modules.nowplaying.KioskNotificationListener', 'the notification listener service'],
   ['android.permission.BIND_NOTIFICATION_LISTENER_SERVICE', 'the system-only bind permission guarding it'],
 ];
+
+// In the storeless build the billing permissions are not merely unnecessary,
+// their absence is the proof that the proprietary library did not make it in.
+if (STORELESS) {
+  for (const name of BILLING.keys()) {
+    FORBIDDEN_STRINGS.push([name, 'a billing permission, in a build with no store']);
+  }
+}
 
 function findManifests(dir) {
   let found = [];
@@ -154,4 +177,8 @@ for (const path of manifests) {
 }
 
 if (failed) process.exit(1);
-console.log('\nManifest surface is exactly as intended.');
+console.log(
+  `\nManifest surface is exactly as intended for the ${
+    STORELESS ? 'storeless' : 'play'
+  } build.`,
+);

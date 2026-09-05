@@ -38,9 +38,13 @@ weather requests you asked for by typing a place name.
 
 **On a phone, from a release** — download `kiosk-clock.apk` from
 [Releases](../../releases), open it, allow installs from unknown sources.
+Everything is unlocked in that build: it has no store behind it, so there is
+nothing to buy and no watermark.
+
 Or build one yourself: run the **Android** workflow from the Actions tab and
 take `kiosk-apk` from the finished run. No Expo account, no Android Studio, no
-local JDK — GitHub's runners already carry the Android SDK.
+local JDK — GitHub's runners already carry the Android SDK. Push a `v*` tag to
+get a release with the APK attached instead.
 
 **On a computer** — `npm install && npm run web`, then F11. Web is a checked
 target, not an afterthought: it is exported and verified alongside iOS and

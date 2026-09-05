@@ -1,8 +1,13 @@
 /**
- * Turns a checkout into the storeless build F-Droid can compile.
+ * Turns a checkout into the build that has no store behind it.
+ *
+ * Two things want this. A sideloaded APK cannot use Play Billing at all —
+ * purchases only work for apps Play itself installed — so an APK carrying the
+ * billing code would show a button that always fails. And F-Droid will not
+ * distribute the library in the first place.
  *
  * F-Droid distributes only free software, and that includes what an app links
- * against. Exactly one proprietary artifact reaches this build:
+ * against. Exactly one proprietary artifact reaches the Play build:
  * `com.android.billingclient:billing`, pulled in at compile scope by
  * `io.github.hyochan.openiap:openiap-google`, which arrives with `expo-iap`.
  * Nothing else in the tree is non-free — the npm dependencies are MIT, ISC,
@@ -19,7 +24,7 @@
  * Run before prebuild, with the matching environment variable so the JavaScript
  * side agrees with the native side:
  *
- *   node scripts/fdroid-prepare.mjs
+ *   node scripts/prepare-storeless.mjs
  *   KIOSK_STORE=none npx expo prebuild --platform android --no-install
  *   KIOSK_STORE=none ./gradlew assembleRelease
  *

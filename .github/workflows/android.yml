@@ -36,6 +36,14 @@ name: Android
 
 on:
   workflow_dispatch:
+    inputs:
+      store:
+        description: 'Which build to make'
+        type: choice
+        default: none
+        options:
+          - none
+          - play
   push:
     tags:
       - 'v*'
@@ -84,6 +92,23 @@ jobs:
         with:
           packages: platform-tools
 
+      # Which app this run builds. A tag push is a sideload release, and a
+      # sideloaded APK cannot use Play Billing at all — purchases only work for
+      # apps Play itself installed — so tags default to the storeless build
+      # rather than shipping a purchase button that always fails.
+      #
+      # 'play' is for the bundle that goes to a Play track, and has to be asked
+      # for explicitly from the Actions tab.
+      - name: Choose the build variant
+        id: variant
+        run: |
+          store="${{ inputs.store || 'none' }}"
+          echo "store=$store" >> "$GITHUB_OUTPUT"
+          if [ "$store" = none ]; then
+            node scripts/prepare-storeless.mjs
+          fi
+          echo "::notice title=Build variant::$store"
+
       - name: Decode the upload key
         id: signing
         env:
@@ -110,6 +135,7 @@ jobs:
       - name: Generate the native project
         env:
           KIOSK_VERSION_CODE: ${{ github.run_number }}
+          KIOSK_STORE: ${{ steps.variant.outputs.store }}
         run: npx expo prebuild --platform android --no-install
 
       # Passed as ORG_GRADLE_PROJECT_* environment variables rather than -P
@@ -117,6 +143,7 @@ jobs:
       - name: Build the bundle and the APK
         working-directory: android
         env:
+          KIOSK_STORE: ${{ steps.variant.outputs.store }}
           ORG_GRADLE_PROJECT_KIOSK_UPLOAD_STORE_FILE: ${{ steps.signing.outputs.present == 'true' && format('{0}/upload.jks', runner.temp) || '' }}
           ORG_GRADLE_PROJECT_KIOSK_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ORG_GRADLE_PROJECT_KIOSK_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -127,6 +154,8 @@ jobs:
       # rather than the source. A dependency can reintroduce a permission
       # without a single line of this repo changing.
       - name: Check the shipped permission surface
+        env:
+          KIOSK_STORE: ${{ steps.variant.outputs.store }}
         run: npm run check:manifest
 
       - name: Report what was built
@@ -167,6 +196,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mv android/app/build/outputs/apk/release/app-release.apk kiosk-clock.apk
+          cat > release-notes.md <<'NOTES'
+          Open the `.apk` on an Android phone and allow installs from unknown
+          sources.
+
+          Everything is unlocked. This build has no store behind it, so there is
+          nothing to buy and no watermark. Now playing reads from an endpoint
+          you set in settings; reading the device's own media session is not in
+          this build.
+
+          Android 7.0 and newer. arm only, so it will not install in a standard
+          x86 emulator.
+          NOTES
           gh release create "$GITHUB_REF_NAME" kiosk-clock.apk \
             --title "Kiosk $GITHUB_REF_NAME" \
-            --notes "Sideload build. Open the .apk on the phone and allow installs from unknown sources."
+            --notes-file release-notes.md
