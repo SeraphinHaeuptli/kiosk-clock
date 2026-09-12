@@ -127,9 +127,22 @@ const WEATHER_HINT =
 // written and works, but its notification listener is excluded from v1, so
 // describing it here would promise a capability the installed app does not
 // have.
+const POMODORO_NOTE =
+  'the long break lands after every fourth focus phase. when a phase runs ' +
+  'out the timer moves to the next one and waits — it never starts a phase ' +
+  'you did not see, however long the app has been away. changing a length ' +
+  'here leaves a phase already under way alone.';
+
 const AUDIO_HINT =
   'point it at any url returning {"title":"...","artist":"...","playing":true}' +
   ' — such as a playerctl or mpris wrapper on the machine doing the playing.';
+
+/** Minutes, pinned to a range. The decoder enforces the same bounds. */
+function minutes(value: number, step: number, low: number, high: number): number {
+  return Math.min(high, Math.max(low, value + step));
+}
+
+const minuteLabel = (value: number) => `${value} min`;
 
 /** "22:00" from a bare hour. */
 function hourLabel(hour: number): string {
@@ -493,6 +506,46 @@ export default function SettingsScreen() {
           tone={tone}
           locked={!founder}
         />
+
+        <Heading>focus timer</Heading>
+        <CheckRow
+          title="pomodoro"
+          hint="a work timer under the clock. tap the screen for start, skip and reset"
+          checked={settings.showPomodoro}
+          onChange={(showPomodoro) => update({ showPomodoro })}
+          tone={tone}
+        />
+        {settings.showPomodoro && (
+          <>
+            {/* Five-minute steps for the two long phases, because that is how
+                everyone writes them down; a break is worth a finer grain. */}
+            <StepRow
+              title="focus"
+              value={minuteLabel(settings.pomodoroFocus)}
+              onStep={(step) =>
+                update({ pomodoroFocus: minutes(settings.pomodoroFocus, step * 5, 1, 180) })
+              }
+              tone={tone}
+            />
+            <StepRow
+              title="break"
+              value={minuteLabel(settings.pomodoroShort)}
+              onStep={(step) =>
+                update({ pomodoroShort: minutes(settings.pomodoroShort, step, 1, 60) })
+              }
+              tone={tone}
+            />
+            <StepRow
+              title="long break"
+              value={minuteLabel(settings.pomodoroLong)}
+              onStep={(step) =>
+                update({ pomodoroLong: minutes(settings.pomodoroLong, step * 5, 1, 120) })
+              }
+              tone={tone}
+            />
+            <Text style={styles.note}>{POMODORO_NOTE}</Text>
+          </>
+        )}
 
         <Heading>kiosk</Heading>
         <CheckRow

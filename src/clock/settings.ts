@@ -111,6 +111,13 @@ export interface ClockSettings {
   countdownDate: string;
   countdownLabel: string;
 
+  /** A work timer under the clock, with its own start and pause. */
+  showPomodoro: boolean;
+  /** All in minutes. A long break lands after every fourth focus phase. */
+  pomodoroFocus: number;
+  pomodoroShort: number;
+  pomodoroLong: number;
+
   /** Charge level under the clock, for a phone left on a dock. */
   showBattery: boolean;
   /**
@@ -165,6 +172,11 @@ export const DEFAULT_SETTINGS: ClockSettings = {
 
   countdownDate: '',
   countdownLabel: '',
+
+  showPomodoro: false,
+  pomodoroFocus: 25,
+  pomodoroShort: 5,
+  pomodoroLong: 15,
 
   showBattery: false,
   showBatteryMeter: false,
@@ -353,6 +365,13 @@ export function decodeSettings(raw: unknown): ClockSettings {
       DEFAULT_SETTINGS.countdownLabel,
       LABEL_LIMIT,
     ),
+
+    showPomodoro: bool(input.showPomodoro, DEFAULT_SETTINGS.showPomodoro),
+    // Floored at a minute because a zero-length phase ends the instant it
+    // starts, which would spin through the cycle as fast as the clock ticks.
+    pomodoroFocus: ranged(input.pomodoroFocus, DEFAULT_SETTINGS.pomodoroFocus, 1, 180),
+    pomodoroShort: ranged(input.pomodoroShort, DEFAULT_SETTINGS.pomodoroShort, 1, 60),
+    pomodoroLong: ranged(input.pomodoroLong, DEFAULT_SETTINGS.pomodoroLong, 1, 120),
 
     showBattery: bool(input.showBattery, DEFAULT_SETTINGS.showBattery),
     showBatteryMeter: bool(

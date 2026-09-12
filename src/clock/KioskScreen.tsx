@@ -39,6 +39,7 @@ import { useWeather } from '@/weather/useWeather';
 
 import { Backdrop } from './Backdrop';
 import { BurnInGuard } from './BurnInGuard';
+import { Pomodoro } from './Pomodoro';
 import { ClockFace } from './ClockFace';
 import { InfoLine } from './InfoLine';
 import { batteryLine, countdownLine, offsetClock, offsetName } from './extras';
@@ -113,6 +114,19 @@ export function KioskScreen() {
   const faceSettings = useMemo(
     () => (look.face === settings.face ? settings : { ...settings, face: look.face }),
     [settings, look.face],
+  );
+
+  /**
+   * Memoised because it is a dependency of the timer's effects, and a fresh
+   * object every render would re-length the phase on every tick.
+   */
+  const pomodoroLengths = useMemo(
+    () => ({
+      focus: settings.pomodoroFocus,
+      short: settings.pomodoroShort,
+      long: settings.pomodoroLong,
+    }),
+    [settings.pomodoroFocus, settings.pomodoroShort, settings.pomodoroLong],
   );
 
   const nowPlaying = useNowPlaying(
@@ -402,6 +416,23 @@ export function KioskScreen() {
             />
           </BurnInGuard>
         </Animated.View>
+
+        {/*
+          Below the face and above the media bar, where the interactive things
+          live. Its own component, and the only thing in the app ticking once a
+          second: drawing it from here would re-render the character art sixty
+          times a minute to move two digits.
+        */}
+        {settings.showPomodoro && (
+          <Pomodoro
+            lengths={pomodoroLengths}
+            tone={tone}
+            dim={dim}
+            chrome={chrome}
+            armed={armed}
+            burnInGuard={settings.burnInGuard}
+          />
+        )}
 
         {atBottom && weather.weather !== null && (
           /*
