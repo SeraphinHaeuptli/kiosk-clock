@@ -214,6 +214,18 @@ jobs:
           Android 7.0 and newer. arm only, so it will not install in a standard
           x86 emulator.
           NOTES
-          gh release create "$GITHUB_REF_NAME" kiosk-clock.apk \
-            --title "Kiosk $GITHUB_REF_NAME" \
-            --notes-file release-notes.md
+          # Two ways a tag arrives, and both have to work. Pushed from a
+          # clone, there is no release yet and one is made here. Created
+          # through GitHub's own Releases page, the release already exists
+          # before this job starts, and `gh release create` would fail on it
+          # after a fourteen-minute build — so the apk is uploaded to the
+          # release instead. --clobber so a re-run replaces the file rather
+          # than refusing.
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "::notice title=Release::already exists, uploading the apk to it"
+            gh release upload "$GITHUB_REF_NAME" kiosk-clock.apk --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" kiosk-clock.apk \
+              --title "Kiosk $GITHUB_REF_NAME" \
+              --notes-file release-notes.md
+          fi
