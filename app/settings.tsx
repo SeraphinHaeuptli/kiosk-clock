@@ -138,6 +138,11 @@ const DOCK_NOTE =
   'one thing done by hand: choose kiosk under display, screen saver, and set ' +
   'it to start while charging. no app can choose itself.';
 
+const DOCK_TIMEOUT_NOTE =
+  'it starts when the screen would otherwise go dark, so nothing happens ' +
+  'until your screen timeout has run out — put the phone down and leave it ' +
+  'alone. a long timeout looks exactly like a broken setting.';
+
 const DOCK_LANDSCAPE_NOTE =
   'off by default because a phone with rotation locked reports portrait ' +
   'however it is lying, and the clock would then never appear at all.';
@@ -553,6 +558,7 @@ export default function SettingsScreen() {
                   onPress={openScreenSaverSettings}
                 />
                 <Text style={styles.note}>{DOCK_NOTE}</Text>
+                <Text style={styles.note}>{DOCK_TIMEOUT_NOTE}</Text>
               </>
             )}
           </>

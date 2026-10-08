@@ -268,6 +268,16 @@ start while charging.** No app can nominate itself, by design. Settings has a
 button that opens that screen, and falls back to display settings on the
 makers who have moved or removed it.
 
+### It waits for the screen timeout
+
+A screen saver starts when the display would otherwise go dark, so nothing
+happens until the screen timeout has elapsed — touching the phone resets it.
+This is worth knowing before concluding anything is broken: a long timeout is
+indistinguishable from a setting that does not work, and it cost this feature
+an afternoon of being written off as unsupported on a device where it worked
+the whole time. Test it by putting the phone down and leaving it, or with the
+"Start now" button in the system screen-saver settings.
+
 ### Conditions
 
 | | |
@@ -280,14 +290,17 @@ dream runs on a locked phone before any JavaScript exists and cannot read a
 SQLite database that nothing has opened. `KioskScreen` mirrors them across
 whenever they change.
 
-### Not verified on a device
+### Verified on a device
 
-Everything above compiles and merges into the manifest, and `check:manifest`
-fails the build if the service or either attribute goes missing. None of it
-has run on a phone on a charger. The parts most likely to disappoint, in
-order: makers who bury or remove the screen-saver setting entirely; a dream
-that the system declines to start while the keyguard is up on some skins; and
-the landscape check, which is best-effort by nature.
+It works: the dream starts, the clock appears, and the lock screen is no
+obstacle. That is the first part of this app confirmed on real hardware rather
+than in a browser, and it covers the whole chain — the module autolinking, the
+manifest merge, both activity attributes, and the dream starting the app.
+
+Still unconfirmed, because the one successful test did not isolate them: the
+wireless-only filter, and the landscape check, which is best-effort by nature
+and off by default. Makers who bury or remove the screen-saver setting
+entirely remain the obvious way for this to be unavailable elsewhere.
 
 ---
 
