@@ -36,7 +36,8 @@
     "plugins": [
       "expo-router",
       "./plugins/withReleaseSigning",
-      "./plugins/withReleaseOptimization"
+      "./plugins/withReleaseOptimization",
+      "./plugins/withLockScreenDock"
     ]
   }
 }

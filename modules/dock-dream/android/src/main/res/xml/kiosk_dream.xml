@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- No settings activity: everything this dream can be told is told through
+     the app's own settings screen, which writes the flags it reads. -->
+<dream xmlns:android="http://schemas.android.com/apk/res/android" />

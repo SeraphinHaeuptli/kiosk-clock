@@ -1,0 +1,32 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <!--
+      Android's screen saver, which the system starts by itself while the
+      device is charging or docked — and which is the only supported way for
+      this app to appear on a locked phone.
+
+      A broadcast receiver watching for the charger cannot do it: starting an
+      activity from the background has been blocked since Android 10, and the
+      only exemption a normal app can obtain is SYSTEM_ALERT_WINDOW, which
+      this app deliberately refuses. A dream is handed the screen by the
+      system, so it already satisfies the first exemption on that list — "the
+      app has a visible window".
+
+      The user has to pick this in Settings -> Display -> Screen saver. No app
+      can select itself, by design.
+    -->
+    <service
+      android:name="expo.modules.dockdream.KioskDreamService"
+      android:exported="true"
+      android:label="Kiosk"
+      android:permission="android.permission.BIND_DREAM_SERVICE">
+      <intent-filter>
+        <action android:name="android.service.dreams.DreamService" />
+        <category android:name="android.intent.category.DEFAULT" />
+      </intent-filter>
+      <meta-data
+        android:name="android.service.dream"
+        android:resource="@xml/kiosk_dream" />
+    </service>
+  </application>
+</manifest>

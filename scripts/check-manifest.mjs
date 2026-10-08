@@ -44,6 +44,14 @@ const ALLOWED = new Map([
 /** Things that must be present, not merely permitted. */
 const REQUIRED_STRINGS = [
   ['android:allowBackup="false"', 'backups staying off'],
+  // Absent, the dock feature is not broken so much as simply not there: the
+  // screen saver would never appear in the system list to be chosen.
+  [
+    'expo.modules.dockdream.KioskDreamService',
+    'the screen saver that opens the clock while charging',
+  ],
+  ['android:showWhenLocked="true"', 'the clock being allowed above the lock screen'],
+  ['android:turnScreenOn="true"', 'starting it waking the display'],
 ];
 
 const BILLING = new Map([

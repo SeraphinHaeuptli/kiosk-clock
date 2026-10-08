@@ -111,6 +111,21 @@ export interface ClockSettings {
   countdownDate: string;
   countdownLabel: string;
 
+  /**
+   * Show the clock when the phone starts its screen saver, locked or not.
+   *
+   * Does nothing until Kiosk is chosen under Settings -> Display -> Screen
+   * saver. No app can nominate itself as the screen saver, and no app can
+   * launch itself when the charger goes on — background activity starts have
+   * been blocked since Android 10 for everything without the draw-over-other-
+   * apps permission, which this app refuses.
+   */
+  dockLaunch: boolean;
+  /** Ignore a cable: only a wireless charger counts. */
+  dockWirelessOnly: boolean;
+  /** Only on its side. Off by default: rotation lock reports portrait always. */
+  dockLandscapeOnly: boolean;
+
   /** A work timer under the clock, with its own start and pause. */
   showPomodoro: boolean;
   /** All in minutes. A long break lands after every fourth focus phase. */
@@ -172,6 +187,10 @@ export const DEFAULT_SETTINGS: ClockSettings = {
 
   countdownDate: '',
   countdownLabel: '',
+
+  dockLaunch: false,
+  dockWirelessOnly: true,
+  dockLandscapeOnly: false,
 
   showPomodoro: false,
   pomodoroFocus: 25,
@@ -364,6 +383,13 @@ export function decodeSettings(raw: unknown): ClockSettings {
       input.countdownLabel,
       DEFAULT_SETTINGS.countdownLabel,
       LABEL_LIMIT,
+    ),
+
+    dockLaunch: bool(input.dockLaunch, DEFAULT_SETTINGS.dockLaunch),
+    dockWirelessOnly: bool(input.dockWirelessOnly, DEFAULT_SETTINGS.dockWirelessOnly),
+    dockLandscapeOnly: bool(
+      input.dockLandscapeOnly,
+      DEFAULT_SETTINGS.dockLandscapeOnly,
     ),
 
     showPomodoro: bool(input.showPomodoro, DEFAULT_SETTINGS.showPomodoro),

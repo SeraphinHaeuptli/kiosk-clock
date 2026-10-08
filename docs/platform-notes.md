@@ -229,6 +229,68 @@ separate icon on the home screen.
 
 ---
 
+## Showing the clock on a locked phone
+
+The obvious design does not work, and it is worth writing down why before
+someone tries it again.
+
+**A broadcast receiver cannot launch the app.** Watching for
+`ACTION_POWER_CONNECTED` and starting the activity is the first thing anyone
+reaches for, and starting an activity from the background has been blocked
+since **Android 10**. The exemptions, from Android's own list, are: a visible
+window, being the current IME, a `PendingIntent` sent by the system,
+`SYSTEM_ALERT_WINDOW`, `START_ACTIVITIES_FROM_BACKGROUND`, being bound by a
+privileged service, the launcher, or a core part of the OS. A receiver is not
+among them. The only one a normal app can obtain is `SYSTEM_ALERT_WINDOW` —
+draw over other apps — which this project strips in `app.json` and which the
+security posture below calls the permission overlay attacks are built on.
+
+**So the clock arrives as a screen saver.** Android starts a `DreamService`
+itself while the device charges or docks, which satisfies the first exemption:
+a dream owns the screen, so it has a visible window. `KioskDreamService` draws
+nothing. It checks its conditions, starts the app and finishes.
+
+`MainActivity` carries `showWhenLocked` and `turnScreenOn`, applied by
+`plugins/withLockScreenDock.js` because `android/` is generated. They are
+manifest attributes rather than runtime calls for a reason: the screen saver
+starts the activity on a phone whose screen is off, and by the time any of our
+code runs it is far too late to ask for either.
+
+Neither attribute unlocks anything. They let this one activity draw above the
+lock screen, the way an alarm or a navigation prompt does. The rest of the
+phone stays locked and the keyguard is still waiting when the clock is
+dismissed.
+
+### The part only you can do
+
+**Kiosk has to be chosen under Settings → Display → Screen saver, and set to
+start while charging.** No app can nominate itself, by design. Settings has a
+button that opens that screen, and falls back to display settings on the
+makers who have moved or removed it.
+
+### Conditions
+
+| | |
+|---|---|
+| wireless only | on by default. Reads the sticky battery broadcast and requires `BATTERY_PLUGGED_WIRELESS`, so a cable does nothing |
+| landscape only | **off** by default. A phone with rotation locked reports portrait however it is lying, so requiring landscape there means the clock never appears |
+
+They live in shared preferences, not in the app's settings store, because the
+dream runs on a locked phone before any JavaScript exists and cannot read a
+SQLite database that nothing has opened. `KioskScreen` mirrors them across
+whenever they change.
+
+### Not verified on a device
+
+Everything above compiles and merges into the manifest, and `check:manifest`
+fails the build if the service or either attribute goes missing. None of it
+has run on a phone on a charger. The parts most likely to disappoint, in
+order: makers who bury or remove the screen-saver setting entirely; a dream
+that the system declines to start while the keyguard is up on some skins; and
+the landscape check, which is best-effort by nature.
+
+---
+
 ## Security posture
 
 What this app can reach, and what it deliberately cannot.

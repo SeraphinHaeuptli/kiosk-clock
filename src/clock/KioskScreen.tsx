@@ -39,6 +39,7 @@ import { useWeather } from '@/weather/useWeather';
 
 import { Backdrop } from './Backdrop';
 import { BurnInGuard } from './BurnInGuard';
+import { setDockRules } from '../../modules/dock-dream';
 import { Pomodoro } from './Pomodoro';
 import { ClockFace } from './ClockFace';
 import { InfoLine } from './InfoLine';
@@ -139,6 +140,19 @@ export function KioskScreen() {
   const battery = useBattery(settings.showBattery || settings.showBatteryMeter);
 
   /* -- Kiosk behaviours ---------------------------------------------------- */
+
+  /**
+   * The screen saver reads these from shared preferences, because it runs on a
+   * locked phone before any of this app's JavaScript exists and cannot reach
+   * the settings store. This is the only thing keeping that copy honest.
+   */
+  useEffect(() => {
+    setDockRules({
+      enabled: settings.dockLaunch,
+      wirelessOnly: settings.dockWirelessOnly,
+      landscapeOnly: settings.dockLandscapeOnly,
+    });
+  }, [settings.dockLaunch, settings.dockWirelessOnly, settings.dockLandscapeOnly]);
 
   useEffect(() => {
     if (!settings.keepAwake) return;

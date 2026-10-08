@@ -45,6 +45,10 @@ import {
 } from '@/ui/Terminal';
 import { openNotificationAccessSettings } from '@/media/nowPlayingSource';
 import {
+  isDockAvailable,
+  openScreenSaverSettings,
+} from '../modules/dock-dream';
+import {
   resolveNowPlayingEndpoint,
   useNowPlaying,
 } from '@/media/useNowPlaying';
@@ -127,6 +131,17 @@ const WEATHER_HINT =
 // written and works, but its notification listener is excluded from v1, so
 // describing it here would promise a capability the installed app does not
 // have.
+const DOCK_NOTE =
+  'android starts a screen saver by itself while the phone charges, and that ' +
+  'is the only way an app may appear on a locked screen — launching itself ' +
+  'when the charger goes on has been blocked since android 10. so this needs ' +
+  'one thing done by hand: choose kiosk under display, screen saver, and set ' +
+  'it to start while charging. no app can choose itself.';
+
+const DOCK_LANDSCAPE_NOTE =
+  'off by default because a phone with rotation locked reports portrait ' +
+  'however it is lying, and the clock would then never appear at all.';
+
 const POMODORO_NOTE =
   'the long break lands after every fourth focus phase. when a phase runs ' +
   'out the timer moves to the next one and waits — it never starts a phase ' +
@@ -506,6 +521,42 @@ export default function SettingsScreen() {
           tone={tone}
           locked={!founder}
         />
+
+        {isDockAvailable && (
+          <>
+            <Heading>dock</Heading>
+            <CheckRow
+              title="show while charging"
+              hint="open the clock when the phone starts its screen saver, locked or not"
+              checked={settings.dockLaunch}
+              onChange={(dockLaunch) => update({ dockLaunch })}
+              tone={tone}
+            />
+            {settings.dockLaunch && (
+              <>
+                <CheckRow
+                  title="wireless only"
+                  hint="ignore a cable"
+                  checked={settings.dockWirelessOnly}
+                  onChange={(dockWirelessOnly) => update({ dockWirelessOnly })}
+                  tone={tone}
+                />
+                <CheckRow
+                  title="landscape only"
+                  hint={DOCK_LANDSCAPE_NOTE}
+                  checked={settings.dockLandscapeOnly}
+                  onChange={(dockLandscapeOnly) => update({ dockLandscapeOnly })}
+                  tone={tone}
+                />
+                <ActionRow
+                  title="choose the screen saver"
+                  onPress={openScreenSaverSettings}
+                />
+                <Text style={styles.note}>{DOCK_NOTE}</Text>
+              </>
+            )}
+          </>
+        )}
 
         <Heading>focus timer</Heading>
         <CheckRow
