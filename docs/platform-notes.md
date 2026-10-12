@@ -188,6 +188,78 @@ printed under "last attempt".
 
 ---
 
+---
+
+## Dimming Hue lamps with no bridge at all
+
+Hue lamps sold since about 2019 have Bluetooth as well as Zigbee, and the Hue
+app drives up to ten of them that way with no bridge in the house. This is the
+same path: `modules/hue-ble` connects the phone straight to each lamp.
+
+**The protocol is not published.** Everything in `LampLink.kt` follows the
+[HueBLE](https://github.com/flip-dots/HueBLE) library, which is also what Home
+Assistant's `hue_ble` integration uses. Lamps advertise service `fe0f`; power
+is one byte on characteristic `932c32bd-0002-…`, brightness one byte from 1 to
+254 on `…-0003-…`. Characteristics are looked up by UUID across every service
+rather than inside a known one, because the service they sit under is not
+consistent. Home Assistant lists six lamp models it has confirmed; others are
+likely but not certain.
+
+### What Android imposes
+
+- **One GATT operation at a time.** A second write issued before the first
+  one's callback arrives is dropped silently, so every read, write and
+  subscription goes through a queue, each waiting for its callback or a
+  six-second timeout.
+- **The control characteristics are encrypted**, so the phone has to be bonded
+  to the lamp. The bond is Android's, not this app's, and the Hue app has
+  usually made one already — so the first attempt is simply to use it, and
+  only an authentication error (GATT 5, 15 or 137) triggers `createBond`.
+- **Writes are coalesced natively as well as in JavaScript.** What the queue
+  holds is the intent to write once; the value it finally sends is whatever
+  was last asked for. A drag therefore costs one write per round trip rather
+  than one per pixel.
+- **A lamp that drops** is retried at 2s, 5s, 10s and then every 30s, which is
+  what makes a lamp switched off at the wall rejoin by itself.
+
+### The permission trade
+
+Two prompted permissions, which is new for this app: `BLUETOOTH_SCAN` and
+`BLUETOOTH_CONNECT`. They are asked for at the moment someone taps to scan,
+never at launch.
+
+What is deliberately *not* asked for is any location permission. Android 11
+and older require `ACCESS_FINE_LOCATION` for a BLE scan — so rather than ask,
+**scanning is refused below Android 12** and the settings screen says why.
+That costs old phones the feature and keeps the app's "never asks where you
+are" claim literally true; `scripts/check-manifest.mjs` now fails the build if
+either location permission reaches the merged manifest. On Android 12 and
+above, `BLUETOOTH_SCAN` carries `neverForLocation`, which asserts the same
+thing formally.
+
+### Things a bridge does better
+
+A bridge is still the better setup where someone has one: it reaches the
+lights from anywhere, holds scenes and routines, and does not need the phone
+to be in the room. Bluetooth is the bridgeless path, and it has real limits —
+ten lamps, line-of-room range, and a lamp that is off at the wall is simply
+not there.
+
+### Not verified against a real lamp
+
+No lamp has ever answered this code. What was verified: picking lamps, both
+slider placements, the failure text, and the exact bytes the writes carry —
+all against a stub, in a browser, with screenshots. What that cannot prove is
+anything about how a real lamp behaves: whether the existing bond is reusable,
+whether a given model exposes these characteristics, or how the Hue app and
+this one share a lamp when both are on the same phone.
+
+If it fails on real hardware, the settings screen is where it says so — every
+step reports its own reason rather than throwing, and those reasons are
+printed under "last attempt".
+
+---
+
 ## Platform notes
 
 **The monospace font is bundled, not borrowed.** Everything here sits on a
@@ -400,11 +472,15 @@ entirely remain the obvious way for this to be unavailable elsewhere.
 
 What this app can reach, and what it deliberately cannot.
 
-**Permissions.** `INTERNET`, `VIBRATE`, and two that arrived with billing:
-`com.android.vending.BILLING`, and `ACCESS_NETWORK_STATE`, which Google's
-billing library uses to check for a connection before calling the store. None
-of the four prompts. All four are asserted against the merged manifest on
-every build, so a dependency cannot add a fifth quietly. Expo's template
+**Permissions.** `INTERNET`, `VIBRATE`, two that arrived with billing —
+`com.android.vending.BILLING` and `ACCESS_NETWORK_STATE`, which Google's
+billing library uses to check for a connection before calling the store — and
+four for Bluetooth lamps: `BLUETOOTH_SCAN` and `BLUETOOTH_CONNECT`, plus the
+two legacy ones capped at API 30. The Bluetooth pair are the only permissions
+in this app that prompt, they are asked for at the moment someone taps to look
+for a lamp, and refusing them costs that one feature. Every one of them is
+asserted against the merged manifest on every build, along with two that must
+never appear: both location permissions. Expo's template
 ships `SYSTEM_ALERT_WINDOW` and the two external-storage permissions under a
 comment reading "OPTIONAL PERMISSIONS, REMOVE WHATEVER YOU DO NOT NEED";
 nothing here needs them, and draw-over-other-apps in particular is the

@@ -111,8 +111,8 @@ brackets, rules and inverse video, so nothing has to be decoded.
 tomorrow. **Now playing** read from the device's own media session, or from an
 HTTPS endpoint you point it at. **A volume bar** you drag sideways — relative,
 not absolute, so a stray tap cannot slam the level. **Philips Hue
-brightness** on a second bar beside it, or in its place, once you have pressed
-the button on your bridge. **Shuffle**, a new look
+brightness** on a second bar beside it, or in its place — over Bluetooth
+straight to the lamps, or through a bridge if you have one. **Shuffle**, a new look
 every quarter hour, hour or day. **Presets** — name a look and come back to it.
 And a line under the date carrying a second time zone, a countdown and the
 battery.
@@ -187,12 +187,14 @@ src/
     InfoLine.tsx        The row those three share, under the date
     KioskScreen.tsx     Composition
   media/                Now playing, system volume, the audio bar
-  lights/               Pairing with a hue bridge, and the brightness it drives
+  lights/               Hue lamps and bridges, and the brightness they drive
   weather/              Domain, the two services, the corner readouts
   billing/              What is for sale, the store port, the watermark
   power/useBattery.ts   Guarded adapter over expo-battery
   ui/                   Headings, checks, choices, fields, steppers, hue rail
 
+modules/hue-ble/        Local Android module: bluetooth straight to hue lamps,
+                        a GATT queue per lamp, no bridge involved
 modules/hue-link/       Local Android module: one HTTPS request to a hue
                         bridge, pinned to the certificate seen at pairing
 modules/now-playing/    Local Android module: a NotificationListenerService

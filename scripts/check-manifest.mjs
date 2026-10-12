@@ -40,6 +40,30 @@ const ALLOWED = new Map([
   ],
   ['android.permission.VIBRATE', 'the haptic tick on the volume bar'],
   [
+    'android.permission.BLUETOOTH_SCAN',
+    'finding philips hue lamps, which speak bluetooth and no longer need a' +
+      ' bridge. Runtime-prompted since Android 12, asked for only when' +
+      ' someone taps to scan, and declared neverForLocation — asserted' +
+      ' below, because losing that flag would quietly make this a location' +
+      ' permission in the eyes of Play and of the person installing it.',
+  ],
+  [
+    'android.permission.BLUETOOTH_CONNECT',
+    'talking to a lamp once it has been found. Runtime-prompted since' +
+      ' Android 12. The other half of the lamp feature and the only other' +
+      ' permission in this app that prompts for anything.',
+  ],
+  [
+    'android.permission.BLUETOOTH',
+    'the same thing on Android 11 and older, where Bluetooth was a single' +
+      ' install-time permission. Capped at API 30 so modern phones never see' +
+      ' it.',
+  ],
+  [
+    'android.permission.BLUETOOTH_ADMIN',
+    'starting a scan on Android 11 and older. Also capped at API 30.',
+  ],
+  [
     'com.kioskclock.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION',
     'AndroidX, targeting API 33+ — a signature permission scoped to this app,' +
       ' guarding its own dynamically registered receivers. Not user-facing and' +
@@ -58,6 +82,12 @@ const REQUIRED_STRINGS = [
   ],
   ['android:showWhenLocked="true"', 'the clock being allowed above the lock screen'],
   ['android:turnScreenOn="true"', 'starting it waking the display'],
+  [
+    'android:usesPermissionFlags="neverForLocation"',
+    'the promise that a bluetooth scan is never used to work out where the' +
+      ' phone is — the thing that keeps this app free of a location' +
+      ' permission',
+  ],
 ];
 
 const BILLING = new Map([
@@ -99,16 +129,46 @@ if (!STORELESS) for (const [name, why] of BILLING) ALLOWED.set(name, why);
  * To ship it in v1.1: drop the exclusion from package.json and move these two
  * lines back into REQUIRED_STRINGS.
  */
+const LISTENER_ADVICE =
+  'v1 ships the endpoint source only. If this is deliberate, see the note' +
+  ' above FORBIDDEN_STRINGS for the two lines to change.';
+
 const FORBIDDEN_STRINGS = [
-  ['expo.modules.nowplaying.KioskNotificationListener', 'the notification listener service'],
-  ['android.permission.BIND_NOTIFICATION_LISTENER_SERVICE', 'the system-only bind permission guarding it'],
+  [
+    'expo.modules.nowplaying.KioskNotificationListener',
+    'the notification listener service',
+    LISTENER_ADVICE,
+  ],
+  [
+    'android.permission.BIND_NOTIFICATION_LISTENER_SERVICE',
+    'the system-only bind permission guarding it',
+    LISTENER_ADVICE,
+  ],
+  [
+    'android.permission.ACCESS_FINE_LOCATION',
+    'the location permission',
+    'Nothing in this app may ask where the phone is. A bluetooth scan can' +
+      ' need it on Android 11 and older, which is exactly why scanning is' +
+      ' refused there instead — see modules/hue-ble. If a dependency brought' +
+      ' this in, block it in app.json rather than letting it ship.',
+  ],
+  [
+    'android.permission.ACCESS_COARSE_LOCATION',
+    'the coarse location permission',
+    'Same rule as the fine one above.',
+  ],
 ];
 
 // In the storeless build the billing permissions are not merely unnecessary,
 // their absence is the proof that the proprietary library did not make it in.
 if (STORELESS) {
   for (const name of BILLING.keys()) {
-    FORBIDDEN_STRINGS.push([name, 'a billing permission, in a build with no store']);
+    FORBIDDEN_STRINGS.push([
+      name,
+      'a billing permission, in a build with no store',
+      'The storeless build must not carry the proprietary billing library at' +
+        ' all. Check that prepare-storeless.mjs ran.',
+    ]);
   }
 }
 
@@ -178,14 +238,10 @@ for (const path of manifests) {
     }
   }
 
-  for (const [needle, what] of FORBIDDEN_STRINGS) {
+  for (const [needle, what, advice] of FORBIDDEN_STRINGS) {
     if (xml.includes(needle)) {
       failed = true;
-      console.error(
-        `  PRESENT and must not be: ${what} (${needle})\n` +
-          '  v1 ships the endpoint source only. If this is deliberate, see the\n' +
-          '  note above FORBIDDEN_STRINGS for the two lines to change.',
-      );
+      console.error(`  PRESENT and must not be: ${what} (${needle})\n  ${advice}`);
     }
   }
 }

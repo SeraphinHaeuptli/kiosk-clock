@@ -35,6 +35,31 @@ export interface BridgeLink {
   groupName: string;
 }
 
+/**
+ * One Bluetooth lamp, as the phone knows it.
+ *
+ * The address is the lamp's Bluetooth address, which is stable until someone
+ * factory-resets the lamp — Hue generates a new random one when they do, and
+ * the lamp then has to be found again.
+ */
+export interface Lamp {
+  address: string;
+  name: string;
+}
+
+/**
+ * Where the light comes from.
+ *
+ * Two completely different things wearing the same slider. A bridge is one
+ * HTTPS endpoint driving a whole room; Bluetooth lamps are a connection each,
+ * held open by the phone, with no bridge in the house. Which one someone has
+ * is a fact about their shelf, not a preference, so this is stored rather than
+ * chosen in settings.
+ */
+export type LightsSource =
+  | { kind: 'bridge'; bridge: BridgeLink }
+  | { kind: 'lamps'; lamps: Lamp[] };
+
 /** A room, a zone, or every light the bridge knows about. */
 export type GroupKind = 'room' | 'zone' | 'all';
 
@@ -116,6 +141,47 @@ export function decodeLink(raw: unknown): BridgeLink | null {
   };
 }
 
+/** `AA:BB:CC:DD:EE:FF`, as Android spells a Bluetooth address. */
+export function isLampAddress(value: string): boolean {
+  return /^([0-9a-f]{2}:){5}[0-9a-f]{2}$/i.test(value.trim());
+}
+
+export function decodeLamps(raw: unknown): Lamp[] {
+  if (!Array.isArray(raw)) return [];
+
+  const lamps: Lamp[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const { address, name } = entry as { address?: unknown; name?: unknown };
+    if (typeof address !== 'string' || !isLampAddress(address)) continue;
+    lamps.push({
+      address: address.trim().toUpperCase(),
+      name: groupName(name, 'lamp'),
+    });
+  }
+  return lamps;
+}
+
+/**
+ * A source out of storage, or null.
+ *
+ * Also reads the shape written before Bluetooth lamps existed, which was a
+ * bare bridge link: settings outlive the build that wrote them, and a bridge
+ * someone paired yesterday should not quietly become "no lights".
+ */
+export function decodeSource(raw: unknown): LightsSource | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const value = raw as { kind?: unknown; lamps?: unknown; bridge?: unknown };
+
+  if (value.kind === 'lamps' || Array.isArray(value.lamps)) {
+    const lamps = decodeLamps(value.lamps);
+    return lamps.length === 0 ? null : { kind: 'lamps', lamps };
+  }
+
+  const bridge = decodeLink(value.kind === 'bridge' ? value.bridge : raw);
+  return bridge === null ? null : { kind: 'bridge', bridge };
+}
+
 /* -- The bridge's own numbers ---------------------------------------------- */
 
 /**
@@ -137,6 +203,32 @@ export function toHueBrightness(level: number): number {
  */
 export function fromGroupState(state: LightState): number {
   return state.on ? clamp01(state.level) : 0;
+}
+
+/* -- A lamp's own numbers -------------------------------------------------- */
+
+/** Hue's Bluetooth scale: 1 is the dimmest a lamp goes, 254 the brightest. */
+const LAMP_MIN = 1;
+const LAMP_MAX = 254;
+
+export function toLampBrightness(level: number): number {
+  return Math.round(clamp01(level) * (LAMP_MAX - LAMP_MIN)) + LAMP_MIN;
+}
+
+/**
+ * The slider's level for a lamp.
+ *
+ * A lamp that is off reads as zero rather than as the brightness it will come
+ * back at, for the same reason a dark room does on the bridge: a slider at 60%
+ * above lights that are out is simply wrong.
+ */
+export function fromLampBrightness(
+  brightness: number | null,
+  on: boolean,
+): number {
+  if (!on) return 0;
+  if (brightness === null) return 1;
+  return clamp01((brightness - LAMP_MIN) / (LAMP_MAX - LAMP_MIN));
 }
 
 /**
@@ -192,17 +284,41 @@ export type LightsStatus =
 export function lightsProblem(status: LightsStatus): string | null {
   switch (status.kind) {
     case 'reading':
-      return 'reaching the bridge...';
+      return 'connecting...';
     case 'failed':
       return status.reason;
     case 'absent':
-      return 'no bridge support in this build';
+      return 'lights are not in this build';
     case 'unpaired':
-      return 'no bridge paired';
+      return 'no lights set up';
     case 'off':
     case 'live':
       return null;
   }
+}
+
+/**
+ * What a hook driving one kind of light has to provide.
+ *
+ * Two of them exist — a bridge over HTTPS, lamps over Bluetooth — and the bar
+ * cannot tell which it is looking at. Keeping them behind one shape is what
+ * lets the slider, the status line and the failure text be written once.
+ */
+export interface Transport {
+  /** 0 to 1. */
+  level: number;
+  /** False until something has actually reported a level. */
+  known: boolean;
+  status: LightsStatus;
+  set: (level: number) => void;
+  setDragging: (dragging: boolean) => void;
+}
+
+/** "living room", or "3 lamps" when there is no one name to use. */
+export function lampsName(lamps: readonly Lamp[]): string {
+  if (lamps.length === 0) return 'lights';
+  if (lamps.length === 1) return lamps[0]?.name ?? 'lamp';
+  return `${lamps.length} lamps`;
 }
 
 /** The same thing as a settings line, which has room to name the group. */
@@ -213,9 +329,9 @@ export function lightsStatusLine(status: LightsStatus, name: string): string {
     case 'absent':
       return 'unavailable in this build';
     case 'unpaired':
-      return 'no bridge paired';
+      return 'nothing set up yet';
     case 'reading':
-      return 'reaching the bridge...';
+      return 'connecting...';
     case 'live':
       return `live for ${name}`;
     case 'failed':

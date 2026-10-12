@@ -2,22 +2,22 @@ import { useEffect, useState } from 'react';
 
 import { asyncStorageAdapter, jsonSlot } from '@/core/storage';
 
-import { decodeLink, type BridgeLink } from './lights';
+import { decodeSource, type BridgeLink, type Lamp, type LightsSource } from './lights';
 
 /**
- * The one paired bridge, shared by everything that asks for it.
+ * The one set of lights this phone drives, shared by everything that asks.
  *
  * Module scope rather than a context, and for a concrete reason: settings is a
- * modal over a live clock, so at the moment a bridge is paired two screens are
+ * modal over a live clock, so at the moment lights are set up two screens are
  * mounted and both want the result. A context would have to be hoisted above
  * the router to do that, and the weather module already solves the same
  * problem the same way.
  */
-const slot = jsonSlot(asyncStorageAdapter, 'kiosk.lights.v1', decodeLink);
+const slot = jsonSlot(asyncStorageAdapter, 'kiosk.lights.v1', decodeSource);
 
-let cached: BridgeLink | null = null;
+let cached: LightsSource | null = null;
 let loaded = false;
-let loading: Promise<BridgeLink | null> | null = null;
+let loading: Promise<LightsSource | null> | null = null;
 const listeners = new Set<() => void>();
 
 function announce(): void {
@@ -26,21 +26,21 @@ function announce(): void {
 }
 
 /** Reads storage once; later callers get the copy in memory. */
-export async function loadLink(): Promise<BridgeLink | null> {
+export async function loadSource(): Promise<LightsSource | null> {
   if (loaded) return cached;
 
   loading ??= slot
     .load()
-    .then((link) => {
-      cached = link;
+    .then((source) => {
+      cached = source;
       loaded = true;
       loading = null;
-      return link;
+      return source;
     })
     .catch(() => {
       // jsonSlot swallows its own failures, so this is belt and braces — but
-      // a load left unresolved would leave the lights section saying "reading
-      // settings" for the rest of the session.
+      // a load left unresolved would leave the lights section saying
+      // "connecting" for the rest of the session.
       loaded = true;
       loading = null;
       return null;
@@ -49,36 +49,44 @@ export async function loadLink(): Promise<BridgeLink | null> {
   return loading;
 }
 
-export async function saveLink(link: BridgeLink): Promise<void> {
-  cached = link;
+async function save(source: LightsSource): Promise<void> {
+  cached = source;
   loaded = true;
   announce();
-  await slot.save(link);
+  await slot.save(source);
+}
+
+export function saveBridge(bridge: BridgeLink): Promise<void> {
+  return save({ kind: 'bridge', bridge });
+}
+
+export function saveLamps(lamps: Lamp[]): Promise<void> {
+  return save({ kind: 'lamps', lamps });
 }
 
 /**
- * Forget the bridge.
+ * Forget the lights.
  *
- * This does not tell the bridge to delete the key it issued — that is done in
- * the Hue app, under the list of connected apps, and the settings screen says
- * so. Removing it here stops this app using it.
+ * This does not tell a bridge to delete the key it issued, and it does not
+ * un-pair a lamp from the phone — a Bluetooth bond belongs to Android, not to
+ * this app. Both of those are done where they live, and settings says so.
  */
-export async function clearLink(): Promise<void> {
+export async function clearSource(): Promise<void> {
   cached = null;
   loaded = true;
   announce();
   await slot.clear();
 }
 
-export interface StoredLink {
-  link: BridgeLink | null;
-  /** False until storage has been read, so nothing claims "not paired" early. */
+export interface StoredSource {
+  source: LightsSource | null;
+  /** False until storage has been read, so nothing claims "not set up" early. */
   ready: boolean;
 }
 
-export function useLink(): StoredLink {
-  const [state, setState] = useState<StoredLink>(() => ({
-    link: cached,
+export function useSource(): StoredSource {
+  const [state, setState] = useState<StoredSource>(() => ({
+    source: cached,
     ready: loaded,
   }));
 
@@ -88,14 +96,14 @@ export function useLink(): StoredLink {
     const sync = () => {
       if (!active) return;
       setState((current) =>
-        current.link === cached && current.ready === loaded
+        current.source === cached && current.ready === loaded
           ? current
-          : { link: cached, ready: loaded },
+          : { source: cached, ready: loaded },
       );
     };
 
     listeners.add(sync);
-    loadLink().then(sync, sync);
+    loadSource().then(sync, sync);
 
     return () => {
       active = false;

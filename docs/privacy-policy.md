@@ -33,7 +33,7 @@ There are exactly five things stored, under these keys:
 | `kiosk.presets.v1` | Saved presets: a name you chose, and the *look* fields only — face, colour, backdrop, backdrop colour, wave speed, wave scale, custom hue. A preset deliberately does not store your weather location or your night schedule. |
 | `kiosk.weather.place.v1` | The last weather place name you typed, together with the latitude, longitude and display label it resolved to. Cached so the same name is looked up once, ever. |
 | `kiosk.founder.test.v1` | A single true/false flag recording whether the Founder pack is unlocked on this device. |
-| `kiosk.lights.v1` | Written only if you pair with a Philips Hue bridge: the bridge's local address and its id, the application key it issued to this phone, the fingerprint of the certificate it presented, and the id and name of the room you chose. The key is a local credential — it dims lights on your own network, it carries no account and no payment, and the bridge can be made to forget it. It is sent to that bridge and to nothing else. |
+| `kiosk.lights.v1` | Written only if you set up Philips Hue lights, and holding one of two things. For **lamps over Bluetooth**: the Bluetooth address of each lamp you picked and the name it reports. For **a bridge**: its local address and id, the application key it issued to this phone, the fingerprint of the certificate it presented, and the id and name of the room you chose. The key is a local credential — it dims lights on your own network, it carries no account and no payment, and the bridge can be made to forget it. Neither is sent anywhere except to the lamp or bridge it belongs to. |
 
 Android's own backup is switched off for this app (`allowBackup="false"` in
 the manifest), so none of the above is copied to Google Drive or restored onto
@@ -47,8 +47,9 @@ the clock and nothing else.
 ## What leaves the device
 
 Five network destinations, all optional, all off until you configure them.
-The last two belong to the Philips Hue feature, and only the smaller of the
-two leaves your home network.
+Two of them belong to the Philips Hue feature, and only the smaller of those
+leaves your home network. Bluetooth lamps are a sixth path and the shortest
+one of all: it does not use the network at all, and is described after them.
 
 ### 1. MET Norway — the weather forecast
 
@@ -139,12 +140,30 @@ two leaves your home network.
 - **The developer sees none of it** — there is no cloud account in this
   feature, and Philips are not told you are using it.
 
-That is the complete list. There is no sixth destination. You can check it
+### 6. Your own Hue lamps, over Bluetooth
+
+- **When:** only after you have picked lamps in Settings → lights, and only
+  while the app is in the foreground. Leaving the app drops the connections;
+  coming back takes them again.
+- **Where:** a radio link from the phone to each lamp, in the same room. No
+  network, no router, no internet, no Philips. A lamp cannot relay anything
+  anywhere: it is a light bulb.
+- **What is sent:** on, off, and a brightness number. What comes back is the
+  same thing — whether the lamp is on, how bright it is, and the name you gave
+  it in the Hue app.
+- **What is stored on the phone:** the Bluetooth address and name of each lamp
+  you picked, in `kiosk.lights.v1`.
+- **Pairing** is Android's, not this app's. If a lamp asks to pair, the phone
+  bonds with it the same way it bonds with headphones, and that bond belongs
+  to Android and outlives this app.
+
+That is the complete list. There is no seventh path. You can check it
 yourself: the only `fetch` calls in the whole codebase are in
 `src/weather/source.ts`, `src/media/nowPlaying.ts` and `src/lights/bridge.ts`
 — the last of which uses it only for the bridge lookup, because requests to
 the bridge itself go through `modules/hue-link`, which exists to pin that
-certificate.
+certificate, and the lamps go through `modules/hue-ble`, which has no network
+access of any kind.
 
 ---
 
@@ -214,8 +233,13 @@ time in Android Settings → Apps → Special app access → Notification access
 
 ## Permissions
 
-Kiosk declares four Android permissions and no others. None of them prompts:
-all four are granted at install, because none is in a dangerous group.
+Kiosk declares eight Android permissions and no others. Six are granted at
+install and prompt for nothing. **Two of them prompt**, and both exist only
+for Bluetooth lamps: they are asked for the first time you tap to look for a
+lamp, never at launch, and refusing them costs you nothing but that one
+feature.
+
+Granted at install, no prompt:
 
 - `INTERNET` — for the optional requests described above, including the ones
   to a Hue bridge on your own network. On Android 16 and earlier, reaching a
@@ -223,12 +247,31 @@ all four are granted at install, because none is in a dangerous group.
   will split that out into a separate prompted permission, and if Kiosk is
   ever built against it, this policy and the list here change with it.
 - `VIBRATE` — for the small haptic tick as the volume bar crosses each cell.
+- `BLUETOOTH` and `BLUETOOTH_ADMIN` — the same Bluetooth access as the two
+  below, on Android 11 and older, where it was granted at install. Both are
+  capped at API 30, so a phone on Android 12 or newer never sees them.
 - `com.android.vending.BILLING` — to sell the Founder pack through Google
   Play. Play requires a digital unlock inside a Play-distributed app to be
   sold this way.
 - `ACCESS_NETWORK_STATE` — required by Google's billing library, which checks
   for a connection before calling the store. It reveals whether the device has
   one, not what is on it or where it goes.
+
+Asked for at the moment you use them, and refusable:
+
+- `BLUETOOTH_SCAN` — to look for Hue lamps. Declared with Android's
+  `neverForLocation` flag, which is a formal statement that scan results are
+  never used to work out where you are. Kiosk does not read them for anything
+  except the Bluetooth address of a lamp you then pick from a list.
+- `BLUETOOTH_CONNECT` — to connect to the lamps you picked and set their
+  brightness.
+
+**There is no location permission of any kind, on any version.** This matters
+because Android 11 and older require one for a Bluetooth scan: rather than ask
+for it, Kiosk refuses to scan on those versions and says so in settings. The
+build is checked against this on every release — `ACCESS_FINE_LOCATION` and
+`ACCESS_COARSE_LOCATION` are both on a list of permissions the merged manifest
+is not allowed to contain.
 
 A fifth entry appears in the manifest,
 `com.kioskclock.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`. It is added by
@@ -277,10 +320,13 @@ the developer. Everything is on your device and you control it directly:
   `kiosk.weather.place.v1`, or the stored Founder-pack flag.
 - **Presets** are deleted individually, with the `[x]` beside each one in
   Settings → presets.
-- **Settings → lights → "forget this bridge"** deletes `kiosk.lights.v1`,
-  which is the address, the key and the chosen room. The bridge itself keeps
-  its copy of the key until you remove Kiosk from the list of connected apps
-  in the Hue app — that list is the bridge's, not this app's.
+- **Settings → lights → "forget this bridge"** or **"forget these lamps"**
+  deletes `kiosk.lights.v1`. For a bridge that is the address, the key and the
+  chosen room; the bridge itself keeps its copy of the key until you remove
+  Kiosk from the list of connected apps in the Hue app, because that list is
+  the bridge's and not this app's. For lamps it is their addresses and names;
+  any Bluetooth pairing is Android's and is removed in Android's own Bluetooth
+  settings, not here.
 - **Uninstalling Kiosk** removes all five storage keys and everything in them.
   Because Android backup is disabled for this app, there is no copy left
   behind in Google Drive to restore.

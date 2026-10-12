@@ -1,0 +1,40 @@
+<!--
+  What talking to a lamp over Bluetooth costs, in permissions.
+
+  Two of these prompt, which no other permission in this app does: Android 12
+  made BLUETOOTH_SCAN and BLUETOOTH_CONNECT runtime permissions. They are
+  asked for the first time someone opens the lights section and taps for a
+  scan, never at launch, and refusing them costs nothing but this feature.
+
+  neverForLocation is the declaration that scan results are never used to work
+  out where the phone is. It is what lets this app keep asking for no location
+  permission at all — the alternative, ACCESS_FINE_LOCATION, is what Android 11
+  and earlier require for a scan, and it is deliberately not here. The cost of
+  leaving it out is written down: on Android 11 and older the scan finds
+  nothing, and the settings screen says why rather than looking broken.
+
+  The two legacy permissions are capped at API 30 and are install-time, so they
+  prompt for nothing. They are what the Bluetooth APIs needed before 12.
+-->
+<manifest
+  xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <!-- Optional: a phone without Bluetooth LE installs and runs fine, minus
+       this one feature. Declaring it required would keep the clock off those
+       devices entirely, which is the wrong trade for a lamp dimmer. -->
+  <uses-feature
+    android:name="android.hardware.bluetooth_le"
+    android:required="false" />
+
+  <uses-permission
+    android:name="android.permission.BLUETOOTH_SCAN"
+    android:usesPermissionFlags="neverForLocation" />
+  <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+  <uses-permission
+    android:name="android.permission.BLUETOOTH"
+    android:maxSdkVersion="30" />
+  <uses-permission
+    android:name="android.permission.BLUETOOTH_ADMIN"
+    android:maxSdkVersion="30" />
+</manifest>

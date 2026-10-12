@@ -9,7 +9,7 @@ import {
   readGroups,
 } from './bridge';
 import { isBridgeAddress, type BridgeLink, type LightGroup } from './lights';
-import { clearLink, saveLink, useLink } from './store';
+import { clearSource, saveBridge, useSource } from './store';
 
 /**
  * The pairing flow, for the settings screen.
@@ -55,7 +55,10 @@ export interface BridgeSetup {
 }
 
 export function useBridgeSetup(): BridgeSetup {
-  const { link } = useLink();
+  const { source } = useSource();
+  // Only a bridge is this hook's business. Lamps on Bluetooth are set up next
+  // door, and a phone that has those has no bridge to report on.
+  const link = source?.kind === 'bridge' ? source.bridge : null;
 
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [groups, setGroups] = useState<readonly LightGroup[] | null>(null);
@@ -229,7 +232,7 @@ export function useBridgeSetup(): BridgeSetup {
       // drives nothing. The list is sorted with rooms first and everything-at-
       // once last, so this is a room wherever there is one; the picker under
       // it is how it gets changed.
-      await saveLink({
+      await saveBridge({
         ...paired,
         groupId: first.id,
         groupName: first.name,
@@ -245,7 +248,7 @@ export function useBridgeSetup(): BridgeSetup {
   const choose = useCallback((group: LightGroup) => {
     const target = linkRef.current;
     if (!target) return;
-    void saveLink({ ...target, groupId: group.id, groupName: group.name });
+    void saveBridge({ ...target, groupId: group.id, groupName: group.name });
   }, []);
 
   const refresh = useCallback(() => {
@@ -258,7 +261,7 @@ export function useBridgeSetup(): BridgeSetup {
     setCandidate(null);
     setGroups(null);
     setProblem(null);
-    void clearLink();
+    void clearSource();
   }, []);
 
   return {

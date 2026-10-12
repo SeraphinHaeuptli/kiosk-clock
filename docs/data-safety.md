@@ -7,7 +7,8 @@ Every answer below is derived from the source, not from the README. The
 network surface of the whole app is three files — `src/weather/source.ts`,
 `src/media/nowPlaying.ts` and `src/lights/bridge.ts` — holding the only four
 `fetch` calls in the codebase, plus `modules/hue-link`, which talks to a
-Philips Hue bridge on the local network and to nothing else. Storage is five
+Philips Hue bridge on the local network and to nothing else, and
+`modules/hue-ble`, which has no network access at all. Storage is five
 `AsyncStorage` keys, listed in `docs/privacy-policy.md`.
 
 ---
@@ -373,6 +374,39 @@ Why not:
 So: **nothing to declare** for this feature either. If a later version ever
 used Signify's *remote* API — the cloud one, with an account behind it — that
 would be a different answer, and this section would have to be rewritten.
+
+---
+
+## The Bluetooth lamps, spelled out
+
+Hue lamps made since about 2019 can be driven straight from the phone with no
+bridge, and that is what `modules/hue-ble` does. It changes no answer on this
+form either, for a shorter reason than the bridge did: **nothing leaves the
+device**. A GATT write carries a brightness number a few metres through the
+air to a light bulb. There is no server, no network, no third party, and a
+lamp cannot pass anything on.
+
+What it does change is the permission card beside the form, and that is worth
+being exact about because it is the first thing in this app that prompts:
+
+- **`BLUETOOTH_SCAN`**, declared `neverForLocation`. That flag is a formal
+  assertion that scan results are not used to derive physical location, and it
+  is what lets the app keep `ACCESS_FINE_LOCATION` out of the manifest
+  entirely. Scan results are read for one field — the Bluetooth address of a
+  lamp — and are not stored, aggregated or sent anywhere.
+- **`BLUETOOTH_CONNECT`**, to talk to the lamps that were picked.
+- Neither is in Play's sensitive-permission set (SMS, Call Log, all-files
+  access, location, and so on), so neither needs a Permissions Declaration
+  Form. If Play ever asks, the answer is the paragraph above.
+- **Scanning is refused below Android 12** rather than asking for
+  `ACCESS_FINE_LOCATION`, which those versions require for a scan. That is a
+  deliberate trade: a feature is unavailable on old phones so that this app
+  never asks anyone where they are. `scripts/check-manifest.mjs` fails the
+  build if either location permission ever appears in the merged manifest.
+
+Data types: **none**. A Bluetooth address belongs to the user's own light
+bulb, is never transmitted off the device, and is not a device identifier of
+the user in Play's sense — it identifies a lamp, not a phone and not a person.
 
 ---
 

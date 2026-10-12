@@ -165,7 +165,7 @@ on android the track can come from the device itself, and that needs notificatio
 
 philips hue, on the same bar
 
-a brightness slider for a room of hue lights, beside the volume bar or in its place. one press of the button on your bridge and kiosk has a key of its own; after that it talks to the bridge on your own network and to nothing else. no hue account, no cloud, and nothing to sign in to.
+a brightness slider for your hue lights, beside the volume bar or in its place. no bridge needed: hue lamps made since about 2019 have bluetooth in them, and the phone talks to them directly. a bridge works too, if you have one. no hue account, no cloud, and nothing to sign in to.
 
 a line under the date
 
@@ -177,7 +177,7 @@ name a look — bedside, desk, dock — and come back to it. a preset holds the 
 
 what it does not do
 
-no account, no sign-in, no server. no analytics, no crash reporting, no advertising. two permissions: internet and vibrate, and android backup is off. weather is requested only once you have typed a place; an endpoint is called only if you type one in. nothing goes to the developer, because there is no developer server.
+no account, no sign-in, no server. no analytics, no crash reporting, no advertising. no location permission of any kind — not even for the bluetooth scan, which is declared as never being used to work out where you are. the only permission that prompts is bluetooth, asked when you go looking for a lamp. android backup is off. weather is requested only once you have typed a place; an endpoint is called only if you type one in. nothing goes to the developer, because there is no developer server.
 
 the founder pack
 
@@ -187,7 +187,7 @@ free to install, and free to keep as a plain clock on plain black. one optional 
 
 ## What's new (first release)
 
-Limit **500 characters**; the version below is **401**. This is the "release
+Limit **500 characters**; the version below is **438**. This is the "release
 notes" field on the production release, not part of the store listing page.
 Same rule as above: paragraphs on one line each, blank line between.
 
@@ -199,7 +199,7 @@ eight clock faces, eight backdrops, five ink colours.
 
 keep-awake, night dimming, burn-in protection and a landscape lock, for a device left running.
 
-weather in the corners for a place you type. a now-playing line over a swipeable volume bar, and a brightness slider for philips hue lights beside it or in its place.
+weather in the corners for a place you type. a now-playing line over a swipeable volume bar, and a brightness slider for philips hue lights — over bluetooth, no bridge needed — beside it or in its place.
 
 presets, shuffle, a second time zone, a countdown and the battery.
 
