@@ -163,6 +163,10 @@ a now-playing line over a volume bar you drag sideways. the gesture is relative,
 
 on android the track can come from the device itself, and that needs notification access. what that grant does, and does not do: android hands over the active media sessions only to an app with notification access, and the only way to ask for it is to declare a notification listener service. kiosk's listener overrides no callbacks, so android delivers no notification to it — the app never receives, reads or stores the contents of any notification: not messages, not email previews, not one-time codes. the title and artist come from android's media session manager, are drawn on screen, and go nowhere else. it is optional and never requested at launch: you turn it on in android's settings, and can revoke it there at any time. without it the media bar uses an http endpoint you supply, or says "nothing playing".
 
+philips hue, on the same bar
+
+a brightness slider for a room of hue lights, beside the volume bar or in its place. one press of the button on your bridge and kiosk has a key of its own; after that it talks to the bridge on your own network and to nothing else. no hue account, no cloud, and nothing to sign in to.
+
 a line under the date
 
 a second time zone, a countdown and the battery share one row. the second clock takes a fixed utc offset rather than a named zone: no timezone database, and no daylight saving.
@@ -183,7 +187,7 @@ free to install, and free to keep as a plain clock on plain black. one optional 
 
 ## What's new (first release)
 
-Limit **500 characters**; the version below is **421**. This is the "release
+Limit **500 characters**; the version below is **401**. This is the "release
 notes" field on the production release, not part of the store listing page.
 Same rule as above: paragraphs on one line each, blank line between.
 
@@ -195,7 +199,7 @@ eight clock faces, eight backdrops, five ink colours.
 
 keep-awake, night dimming, burn-in protection and a landscape lock, for a device left running.
 
-weather in the corners for a place you type. a now-playing line over a swipeable volume bar; on android the track can come from the device media session if you grant notification access.
+weather in the corners for a place you type. a now-playing line over a swipeable volume bar, and a brightness slider for philips hue lights beside it or in its place.
 
 presets, shuffle, a second time zone, a countdown and the battery.
 

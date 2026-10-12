@@ -28,6 +28,16 @@ export type WaveScale = 'fine' | 'medium' | 'coarse';
 /** 'match' follows the clock's own tone; anything else overrides it. */
 export type BackdropTone = 'match' | ToneId;
 
+/**
+ * Where a Philips Hue brightness slider goes, if anywhere.
+ *
+ * 'instead' takes the volume bar's place rather than sitting under it, which
+ * is the whole reason this is three choices and not a checkbox: a phone parked
+ * on a dock is more often reached for to dim a room than to change the volume
+ * of whatever is playing on something else.
+ */
+export type LightsSlider = 'off' | 'beside' | 'instead';
+
 /** What the shuffle is allowed to change, if anything. */
 export type ShuffleMode = 'off' | 'backdrops' | 'everything';
 /** How long a shuffled look holds before the next one. */
@@ -143,6 +153,15 @@ export interface ClockSettings {
    * well want the gauge by the volume and nothing under the clock face.
    */
   showBatteryMeter: boolean;
+
+  /**
+   * A brightness slider for the lights, in the audio bar.
+   *
+   * Only ever drawn once a bridge is paired, which is not a setting — it is a
+   * key the bridge issued, kept in its own store. This is only where the
+   * slider goes.
+   */
+  lights: LightsSlider;
 }
 
 export const DEFAULT_SETTINGS: ClockSettings = {
@@ -199,6 +218,8 @@ export const DEFAULT_SETTINGS: ClockSettings = {
 
   showBattery: false,
   showBatteryMeter: false,
+
+  lights: 'off',
 };
 
 /** Exported so the shuffle can pick from them without importing components. */
@@ -230,6 +251,7 @@ export type WeatherPosition = 'top' | 'bottom';
 
 const WEATHER_POSITIONS: readonly WeatherPosition[] = ['top', 'bottom'];
 const SHUFFLE_MODES: readonly ShuffleMode[] = ['off', 'backdrops', 'everything'];
+const LIGHTS_SLIDERS: readonly LightsSlider[] = ['off', 'beside', 'instead'];
 const SHUFFLE_PERIODS: readonly ShufflePeriod[] = ['quarter', 'hour', 'day'];
 
 /** Wraps rather than clamps: a hue is a circle, and 400 degrees is 40. */
@@ -404,6 +426,8 @@ export function decodeSettings(raw: unknown): ClockSettings {
       input.showBatteryMeter,
       DEFAULT_SETTINGS.showBatteryMeter,
     ),
+
+    lights: oneOf(LIGHTS_SLIDERS, input.lights, DEFAULT_SETTINGS.lights),
   };
 }
 

@@ -33,6 +33,8 @@ import {
   useNowPlaying,
 } from '@/media/useNowPlaying';
 import { useVolume } from '@/media/useVolume';
+import { lightsProblem } from '@/lights/lights';
+import { useLights } from '@/lights/useLights';
 import { useBattery } from '@/power/useBattery';
 import { WeatherNow, WeatherPlace } from '@/weather/WeatherCorners';
 import { useWeather } from '@/weather/useWeather';
@@ -135,6 +137,9 @@ export function KioskScreen() {
     settings.showMedia,
   );
   const volume = useVolume(settings.showMedia);
+  // The bar is where the slider goes, so there is nothing to drive when the
+  // bar is not on screen.
+  const lights = useLights(settings.showMedia && settings.lights !== 'off');
   const weather = useWeather(settings.weatherPlace, settings.showWeather);
   // Either readout brings the subscription up; neither leaves it down.
   const battery = useBattery(settings.showBattery || settings.showBatteryMeter);
@@ -477,10 +482,35 @@ export function KioskScreen() {
           <Animated.View style={[styles.meter, { opacity: dim }]}>
             <MediaBar
               tone={tone}
-              volume={volume.level}
-              controllable={volume.controllable}
-              onChange={volume.set}
-              onDragChange={volume.setDragging}
+              /*
+                'instead' only takes the volume away when there is actually a
+                brightness bar to put in its place. Hiding it for a setting
+                whose bridge has never been paired would leave the bar with no
+                slider on it at all, which reads as a broken release rather
+                than as an unfinished setup.
+              */
+              volume={
+                settings.lights === 'instead' && lights.shown
+                  ? null
+                  : {
+                      level: volume.level,
+                      controllable: volume.controllable,
+                      onChange: volume.set,
+                      onDragChange: volume.setDragging,
+                    }
+              }
+              lights={
+                lights.shown
+                  ? {
+                      level: lights.level,
+                      controllable: lights.controllable,
+                      onChange: lights.set,
+                      onDragChange: lights.setDragging,
+                      name: lights.name,
+                      problem: lightsProblem(lights.status),
+                    }
+                  : null
+              }
               nowPlaying={nowPlaying.result}
               onControl={nowPlaying.control}
               battery={

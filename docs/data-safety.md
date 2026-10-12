@@ -4,10 +4,11 @@ Answers for **Kiosk** (`com.kioskclock.app`), with the reasoning behind each
 one so a human can check it rather than trust it.
 
 Every answer below is derived from the source, not from the README. The
-network surface of the whole app is two files — `src/weather/source.ts` and
-`src/media/nowPlaying.ts` — and they contain the only three `fetch` calls in
-the codebase. Storage is four `AsyncStorage` keys, listed in
-`docs/privacy-policy.md`.
+network surface of the whole app is three files — `src/weather/source.ts`,
+`src/media/nowPlaying.ts` and `src/lights/bridge.ts` — holding the only four
+`fetch` calls in the codebase, plus `modules/hue-link`, which talks to a
+Philips Hue bridge on the local network and to nothing else. Storage is five
+`AsyncStorage` keys, listed in `docs/privacy-policy.md`.
 
 ---
 
@@ -289,8 +290,8 @@ the generated manifest.
 
 ## The IP address question, spelled out
 
-Every one of the three requests exposes the device's IP address to whoever
-receives it. That is a property of making an HTTP request, not a feature of
+Every request that leaves the network exposes the device's IP address to
+whoever receives it. That is a property of making an HTTP request, not a feature of
 the app. Does it need declaring?
 
 **Recommendation: no separate declaration — but disclose it in the privacy
@@ -313,8 +314,9 @@ Reasoning:
 
 **Where I would hesitate:** if you ever add a first-party endpoint of your
 own — a licence check, a config fetch, anything — then you *are* receiving the
-IP, and this answer needs revisiting. As long as the three destinations are
-two public weather services and a URL the user typed themselves, it stands.
+IP, and this answer needs revisiting. As long as the destinations are two
+public weather services, Philips' bridge lookup, a box on the user's own
+network and a URL the user typed themselves, it stands.
 
 ---
 
@@ -337,6 +339,40 @@ Worth its own note because it looks alarming and is not.
 
 So: **nothing to declare** for this feature. If the app ever started sending
 device state or identifiers to that endpoint, that would change — it does not.
+
+---
+
+## The Philips Hue lights, spelled out
+
+The lights slider adds two destinations and changes no answer on the form.
+Why not:
+
+- **The bridge itself is on the user's own network.** The application key and
+  the brightness commands go from the phone to a box in the same house. That
+  is not transmission to the developer or to a third party, and there is no
+  cloud account anywhere in the feature — Signify are not told it is being
+  used. Play's definition of collection turns on data leaving the device *to
+  someone*; traffic to the user's own hardware on their own LAN is the same
+  kind of thing as writing to the user's own storage.
+- **The one request that does leave is a lookup with nothing in it.**
+  `https://discovery.meethue.com` is asked which bridges share a public
+  address with the caller. The app sends no body, no query and no identifier:
+  the service's answer is derived from the IP address the request arrives on,
+  which is the IP question already answered above. It happens only when the
+  user taps "find my bridge", never on a timer, and typing the bridge's
+  address by hand skips it entirely.
+- **What comes back is not user data.** A bridge id and a private IPv4
+  address, both belonging to hardware in the user's house, stored in
+  `kiosk.lights.v1` and sent nowhere.
+- **Encryption in transit (Q2) still holds.** The lookup is HTTPS. So is the
+  bridge, which is the reason `modules/hue-link` exists at all: a Hue bridge
+  presents a certificate no public authority has signed, so the app pins the
+  one it saw when pairing rather than dropping to the bridge's old cleartext
+  API.
+
+So: **nothing to declare** for this feature either. If a later version ever
+used Signify's *remote* API — the cloud one, with an account behind it — that
+would be a different answer, and this section would have to be rewritten.
 
 ---
 

@@ -13,10 +13,11 @@ Kiosk is a clock. It has no account, no server, no analytics, no advertising
 and no crash reporting. The developer receives nothing about you, because
 there is nowhere for it to be sent.
 
-Everything you configure is stored on your own device. Three optional features
+Everything you configure is stored on your own device. A few optional features
 make network requests, and each one only starts making them after you have
-typed something into settings to turn it on. None of those requests goes to
-the developer.
+turned it on in settings. None of those requests goes to the developer, and
+the one that controls Philips Hue lights does not leave your own network at
+all once it has been set up.
 
 ---
 
@@ -24,14 +25,15 @@ the developer.
 
 All of it lives in the app's own private storage on your device
 (`AsyncStorage`, which on Android is a database inside the app's sandbox).
-There are exactly four things stored, under these keys:
+There are exactly five things stored, under these keys:
 
 | Key | What is in it |
 |---|---|
-| `kiosk.settings.v1` | Every setting: the face, colour, backdrop, 12/24-hour, seconds, date, keep-awake, night dimming hours and depth, burn-in guard, landscape lock, shuffle, custom hue, the now-playing endpoint URL you typed, the weather place name you typed and your temperature unit, the second-clock offset and its label, the countdown date and its label, and the battery toggle. |
+| `kiosk.settings.v1` | Every setting: the face, colour, backdrop, 12/24-hour, seconds, date, keep-awake, night dimming hours and depth, burn-in guard, landscape lock, shuffle, custom hue, the now-playing endpoint URL you typed, the weather place name you typed and your temperature unit, the second-clock offset and its label, the countdown date and its label, the battery toggle, and where the lights slider goes. |
 | `kiosk.presets.v1` | Saved presets: a name you chose, and the *look* fields only — face, colour, backdrop, backdrop colour, wave speed, wave scale, custom hue. A preset deliberately does not store your weather location or your night schedule. |
 | `kiosk.weather.place.v1` | The last weather place name you typed, together with the latitude, longitude and display label it resolved to. Cached so the same name is looked up once, ever. |
 | `kiosk.founder.test.v1` | A single true/false flag recording whether the Founder pack is unlocked on this device. |
+| `kiosk.lights.v1` | Written only if you pair with a Philips Hue bridge: the bridge's local address and its id, the application key it issued to this phone, the fingerprint of the certificate it presented, and the id and name of the room you chose. The key is a local credential — it dims lights on your own network, it carries no account and no payment, and the bridge can be made to forget it. It is sent to that bridge and to nothing else. |
 
 Android's own backup is switched off for this app (`allowBackup="false"` in
 the manifest), so none of the above is copied to Google Drive or restored onto
@@ -44,7 +46,9 @@ the clock and nothing else.
 
 ## What leaves the device
 
-Three network destinations, all optional, all off until you configure them.
+Five network destinations, all optional, all off until you configure them.
+The last two belong to the Philips Hue feature, and only the smaller of the
+two leaves your home network.
 
 ### 1. MET Norway — the weather forecast
 
@@ -103,9 +107,44 @@ Three network destinations, all optional, all off until you configure them.
   displayed and held in memory. It is not written to storage and is not sent
   anywhere.
 
-That is the complete list. There is no fourth destination. You can check it
+### 4. Philips Hue's bridge lookup — finding your bridge
+
+- **When:** only when you tap Settings → lights → "find my bridge". Typing the
+  bridge's address into the field beside it instead skips this request
+  entirely, and nothing here runs again once a bridge is paired.
+- **Where:** `https://discovery.meethue.com`
+- **What is sent:** nothing but the request. The service answers with the
+  bridges that share a public address with whoever is asking, so it sees your
+  IP address — the same address every site you open already sees — and no
+  other information at all. No identifier, no settings, nothing about the
+  lights.
+- **Whose it is:** Signify, who make Philips Hue. What that service logs is
+  covered by their own privacy notice, which is linked from the Philips Hue
+  website — not by this policy, and not by anything the developer controls.
+
+### 5. Your own Hue bridge — the brightness slider itself
+
+- **When:** only after you have paired with a bridge, and only while the
+  lights slider is switched on.
+- **Where:** the bridge on your own network, at the address stored in
+  `kiosk.lights.v1`. This traffic does not leave your home: it goes from the
+  phone to a box in your house and no further.
+- **What is sent:** the application key that bridge issued to this phone, and
+  brightness commands for the room you chose. The connection is HTTPS, and
+  after pairing the app will only talk to a bridge presenting exactly the
+  certificate it recorded at the time.
+- **How often:** once when the clock starts, every thirty seconds while the
+  slider is on screen, when the app returns to the foreground, and whenever
+  you move the slider.
+- **The developer sees none of it** — there is no cloud account in this
+  feature, and Philips are not told you are using it.
+
+That is the complete list. There is no sixth destination. You can check it
 yourself: the only `fetch` calls in the whole codebase are in
-`src/weather/source.ts` and `src/media/nowPlaying.ts`.
+`src/weather/source.ts`, `src/media/nowPlaying.ts` and `src/lights/bridge.ts`
+— the last of which uses it only for the bridge lookup, because requests to
+the bridge itself go through `modules/hue-link`, which exists to pin that
+certificate.
 
 ---
 
@@ -178,7 +217,11 @@ time in Android Settings → Apps → Special app access → Notification access
 Kiosk declares four Android permissions and no others. None of them prompts:
 all four are granted at install, because none is in a dangerous group.
 
-- `INTERNET` — for the three optional requests described above.
+- `INTERNET` — for the optional requests described above, including the ones
+  to a Hue bridge on your own network. On Android 16 and earlier, reaching a
+  device on your local network is covered by this permission; a later Android
+  will split that out into a separate prompted permission, and if Kiosk is
+  ever built against it, this policy and the list here change with it.
 - `VIBRATE` — for the small haptic tick as the volume bar crosses each cell.
 - `com.android.vending.BILLING` — to sell the Founder pack through Google
   Play. Play requires a digital unlock inside a Play-distributed app to be
@@ -234,7 +277,11 @@ the developer. Everything is on your device and you control it directly:
   `kiosk.weather.place.v1`, or the stored Founder-pack flag.
 - **Presets** are deleted individually, with the `[x]` beside each one in
   Settings → presets.
-- **Uninstalling Kiosk** removes all four storage keys and everything in them.
+- **Settings → lights → "forget this bridge"** deletes `kiosk.lights.v1`,
+  which is the address, the key and the chosen room. The bridge itself keeps
+  its copy of the key until you remove Kiosk from the list of connected apps
+  in the Hue app — that list is the bridge's, not this app's.
+- **Uninstalling Kiosk** removes all five storage keys and everything in them.
   Because Android backup is disabled for this app, there is no copy left
   behind in Google Drive to restore.
 

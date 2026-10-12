@@ -96,6 +96,98 @@ nothing is indistinguishable from silence:
 
 ---
 
+## Dimming Philips Hue lights
+
+A brightness slider in the audio bar, beside the volume or in its place. It
+drives one group — a room, a zone, or every light the bridge knows — and the
+whole of the setup is pressing the round button on the bridge once.
+
+**It talks to the bridge, not to the Hue app.** The Hue app is how the lights
+got set up and how the bridge issues keys to anyone at all, but it exposes no
+interface another app can drive. Nothing here goes through it.
+
+### Why there is native code for one HTTP request
+
+A Hue bridge speaks HTTPS with a certificate no public authority has signed,
+issued to its own bridge id rather than to an address, with no subjectAltName
+on it. Standard name verification against `192.168.1.x` therefore fails before
+anything else is considered, and React Native's `fetch` offers no way to pin a
+certificate or replace the verifier. So the choice was:
+
+- the bridge's **old v1 API over plain HTTP**, which needs no native code but
+  does need cleartext traffic permitted in a build whose every other request
+  is deliberately https-only — and which Signify have said will be blocked
+  once every bridge carries a signed certificate; or
+- **the v2 API over HTTPS**, with the handshake done somewhere the rules can
+  be written down.
+
+`modules/hue-link` is the second one: about a hundred lines of Kotlin around
+`HttpsURLConnection`, with a trust manager that enforces two things and a
+`SSLContext` built per request, because a cached TLS session resumes without
+consulting the trust manager at all.
+
+### What replaces certificate verification
+
+1. **Before pairing**, the certificate's common name must equal the bridge id
+   that `discovery.meethue.com` reported — a service reached over ordinary,
+   properly verified HTTPS. That ties the box on the LAN to a name obtained
+   from outside it.
+2. **At pairing**, the fingerprint of that certificate is stored beside the
+   application key, and every later request must meet exactly it.
+
+The check happens inside the trust manager rather than after connecting, so a
+rejection ends the handshake before the application key is sent to whatever
+answered. What this is not proof against: a machine on the same wifi
+impersonating a bridge during the few seconds of pairing itself. What it would
+get for that is the ability to be asked to dim some lights.
+
+### Rate, and what a zero means
+
+Signify ask for no more than one command per second to a group. A finger
+crossing a slider generates far more, so writes are coalesced to one per
+400 ms with the value the finger stopped on always sent — above their figure
+deliberately, because a full second of lag reads as a broken control and a
+dropped command costs nothing when the next write carries the whole state.
+
+Hue will not accept a brightness of zero: writing one sets the lamp's lowest
+brightness. The bottom of the slider therefore sends `on: false` instead,
+which is what a dimmer does, and anything above it sends `on: true` in the
+same request — a brightness written to a group that is off is remembered
+rather than shown, which looks exactly like a slider that does nothing.
+
+### Local network access, and Android 17
+
+Reaching a device on the local network needs no permission beyond `INTERNET`
+for an app targeting API 36 or lower, and Google's documentation says
+explicitly not to declare one: the grant is implicit. Android 17 ends that.
+Apps targeting API 37 and higher must hold `ACCESS_LOCAL_NETWORK`, a runtime
+permission in the `NEARBY_DEVICES` group, and without it outbound LAN traffic
+fails — TCP by timeout, UDP with `EPERM`. Internet access is unaffected, which
+means the symptom of getting this wrong is a bridge that is "not there" while
+the weather keeps working.
+
+So when this app's target API level is next raised past 36, this feature needs
+the permission added, requested at runtime before the first bridge request,
+and declared in `scripts/check-manifest.mjs`, the privacy policy and the store
+listing. Nothing else in the app is affected.
+
+### Not verified against a real bridge
+
+Nothing here has met one. What was verified: the pairing flow, the room
+picker, both slider placements, the failure text and the request bodies — all
+against a stub standing in for the native client, in a browser, with
+screenshots. What that cannot prove is the part only hardware can answer:
+whether the certificate's common name really is the bridge id on a given
+firmware, whether `/api/0/config` answers unauthenticated on it, and whether
+the v2 resources are laid out as assumed. All three are documented behaviour;
+none of them is tested here.
+
+If it fails on a real bridge, the settings screen is where it says so — every
+request reports its own reason rather than throwing, and those reasons are
+printed under "last attempt".
+
+---
+
 ## Platform notes
 
 **The monospace font is bundled, not borrowed.** Everything here sits on a
@@ -334,6 +426,14 @@ user typed it. Only `http(s)` URLs are fetched at all, the body is read as text
 and rejected over 64 KB before parsing — `response.json()` would otherwise
 buffer whatever a hostile or broken server sent — and decoded fields are
 truncated. Cleartext `http` is separately refused by the platform at API 36.
+
+**The Hue bridge is pinned, not trusted.** It is the only thing this app
+talks to over a connection no public authority vouches for, and the trade is
+written out above: the certificate is matched against a fingerprint recorded
+at pairing, inside the handshake, on a `SSLContext` built for that one
+request. The relaxed hostname verifier belongs to that connection and nothing
+else — `HttpsURLConnection.setDefaultSSLSocketFactory` is deliberately never
+touched, because it would quietly apply to the weather requests too.
 
 **Nothing is evaluated.** No `eval`, no `dangerouslySetInnerHTML`, no
 `WebView`, no dynamic imports of remote code, and OTA updates are disabled, so

@@ -43,6 +43,7 @@ import {
   TextRow,
   type Choice,
 } from '@/ui/Terminal';
+import { LightsSection } from '@/lights/LightsSection';
 import { openNotificationAccessSettings } from '@/media/nowPlayingSource';
 import {
   isDockAvailable,
@@ -813,6 +814,12 @@ export default function SettingsScreen() {
           />
         )}
         <Text style={styles.note}>{AUDIO_HINT}</Text>
+
+        <LightsSection
+          placement={settings.lights}
+          onPlacement={(lights) => update({ lights })}
+          tone={tone}
+        />
 
         <Heading>founder</Heading>
         <StatusRow

@@ -31,7 +31,13 @@ const STORELESS = process.env.EXPO_PUBLIC_KIOSK_STORE === 'none';
 
 /** Everything the app is allowed to ask for, and why. Also: required. */
 const ALLOWED = new Map([
-  ['android.permission.INTERNET', 'weather and the optional now-playing endpoint'],
+  [
+    'android.permission.INTERNET',
+    'weather, the optional now-playing endpoint, and a philips hue bridge on' +
+      ' the local network. Local network access is implicit under INTERNET' +
+      ' while this targets API 36 or lower; targeting 37 adds a prompted' +
+      ' ACCESS_LOCAL_NETWORK, which would belong here too.',
+  ],
   ['android.permission.VIBRATE', 'the haptic tick on the volume bar'],
   [
     'com.kioskclock.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION',

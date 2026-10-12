@@ -10,6 +10,7 @@ import {
 import * as Haptics from 'expo-haptics';
 
 import { batteryLine } from '@/clock/extras';
+import { clamp01, formatPercent } from '@/core/format';
 import { label, surface, type Tone } from '@/design/palette';
 import { MONO_ASPECT, hairline, mono, space, type } from '@/design/tokens';
 
@@ -18,7 +19,6 @@ import {
   type NowPlayingResult,
   type TransportAction,
 } from './nowPlaying';
-import { clampVolume, formatVolume } from './volume';
 
 const FILL = '█';
 const EMPTY = '░';
@@ -27,12 +27,32 @@ const MIN_CELLS = 8;
 const CHARGE_FONT = 10;
 const CHARGE_CELLS = 5;
 
-interface Props {
-  tone: Tone;
-  volume: number;
+/** A level this bar can drive: the device volume, or a room's brightness. */
+export interface RailState {
+  /** 0 to 1. */
+  level: number;
+  /**
+   * False draws the rail but refuses the gesture — there is nothing on the
+   * other end of it to move.
+   */
   controllable: boolean;
   onChange: (level: number) => void;
   onDragChange: (dragging: boolean) => void;
+}
+
+export interface LightsRail extends RailState {
+  /** The group's name, which takes the place of the gesture hint. */
+  name: string;
+  /** What is wrong instead, when something is. */
+  problem: string | null;
+}
+
+interface Props {
+  tone: Tone;
+  /** The volume bar, or null when the lights have taken its place. */
+  volume: RailState | null;
+  /** The brightness bar, or null when it is off or no bridge is paired. */
+  lights: LightsRail | null;
   nowPlaying: NowPlayingResult | null;
   onControl: (action: TransportAction) => void;
   /** Charge to draw beside the transport keys, or null to draw none. */
@@ -92,7 +112,151 @@ function Key({
 }
 
 /**
- * A charge gauge, in the same block glyphs as the volume bar above it.
+ * A level you drag sideways, drawn as block glyphs.
+ *
+ * The gesture is relative, not absolute: a swipe moves the level by how far
+ * the finger travelled rather than jumping to wherever it landed. Absolute
+ * positioning would make a stray tap on the bar slam the volume — or the
+ * lights — to that point, which is the wrong behaviour for a device left
+ * sitting on a desk.
+ *
+ * Each rail carries its own responder rather than sharing one on the bar.
+ * With two of them there is no sensible reading of a swipe that lands between
+ * them, and a single responder would have to guess which level it meant.
+ */
+function Rail({
+  tone,
+  state,
+  title,
+  hint,
+  caption,
+  spaced,
+}: {
+  tone: Tone;
+  state: RailState;
+  /** Header line, left: the track, or nothing on a second rail. */
+  title: string;
+  /** Meta line, left: how to use it, or what is wrong, or which room. */
+  hint: string;
+  /** Meta line, right: what this rail drives. */
+  caption: string;
+  /** A rail under another one needs a gap, or the six lines read as one block. */
+  spaced?: boolean;
+}) {
+  const [cells, setCells] = useState(MIN_CELLS);
+  const [width, setWidth] = useState(0);
+
+  /**
+   * The responder has to outlive the renders its own onChange causes: a
+   * PanResponder keeps the gesture's accumulated dx inside the object
+   * `create()` returns, so rebuilding it mid-drag resets that to zero and the
+   * level stops following the finger. Everything it needs is read through a
+   * ref, and it is built once.
+   */
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const widthRef = useRef(0);
+  widthRef.current = width;
+  const startLevel = useRef(state.level);
+  const lastFilled = useRef(-1);
+
+  const onLayout = (event: LayoutChangeEvent) => {
+    const available = event.nativeEvent.layout.width;
+    setWidth(available);
+    // Two cells go to the enclosing brackets.
+    setCells(
+      Math.max(MIN_CELLS, Math.floor(available / (FONT * MONO_ASPECT)) - 2),
+    );
+  };
+
+  const responder = useMemo(
+    () =>
+      PanResponder.create({
+        // Not on touch-down, which would swallow every tap on the transport
+        // keys below before they saw it. Nothing happens on the press anyway:
+        // the level is only read when the finger starts moving, so waiting for
+        // movement costs the gesture nothing and gives the keys their taps.
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          // Claim the gesture only once it is clearly horizontal, so a vertical
+          // swipe still belongs to whatever is behind the bar.
+          stateRef.current.controllable &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy),
+        onPanResponderGrant: () => {
+          startLevel.current = stateRef.current.level;
+          lastFilled.current = -1;
+          stateRef.current.onDragChange(true);
+        },
+        onPanResponderMove: (_, gesture) => {
+          const span = widthRef.current;
+          if (span <= 0) return;
+          stateRef.current.onChange(
+            clamp01(startLevel.current + gesture.dx / span),
+          );
+        },
+        onPanResponderRelease: () => stateRef.current.onDragChange(false),
+        onPanResponderTerminate: () => stateRef.current.onDragChange(false),
+      }),
+    [],
+  );
+
+  const filled = Math.round(clamp01(state.level) * cells);
+
+  // One tick per cell crossed, the way a physical volume wheel detents.
+  if (lastFilled.current !== -1 && filled !== lastFilled.current) {
+    Haptics.selectionAsync().catch(() => {});
+  }
+  lastFilled.current = filled;
+
+  const percent = Math.round(clamp01(state.level) * 100);
+
+  return (
+    <View
+      onLayout={onLayout}
+      style={spaced && styles.spaced}
+      // A slider, and announced as one: the whole rail is the control, and
+      // without this a screen reader reads three unrelated lines of text and
+      // a row of block glyphs.
+      accessibilityRole="adjustable"
+      accessibilityLabel={caption}
+      accessibilityValue={{ min: 0, max: 100, now: percent }}
+      {...responder.panHandlers}
+    >
+      <View style={styles.row}>
+        <Text style={styles.title} numberOfLines={1}>
+          {title}
+        </Text>
+        <Text
+          style={[styles.level, { color: tone.color }]}
+          allowFontScaling={false}
+        >
+          {formatPercent(state.level)}
+        </Text>
+      </View>
+
+      <Text style={styles.bar} allowFontScaling={false} numberOfLines={1}>
+        <Text style={{ color: label.quaternary }}>[</Text>
+        <Text style={{ color: tone.color }}>{FILL.repeat(filled)}</Text>
+        <Text style={{ color: label.quaternary }}>
+          {EMPTY.repeat(Math.max(0, cells - filled))}
+        </Text>
+        <Text style={{ color: label.quaternary }}>]</Text>
+      </Text>
+
+      <View style={styles.row}>
+        <Text style={styles.meta} numberOfLines={1}>
+          {hint}
+        </Text>
+        <Text style={styles.meta} allowFontScaling={false}>
+          {caption}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+/**
+ * A charge gauge, in the same block glyphs as the bars above it.
  *
  * Labelled, because the bar it sits under also ends in a percentage and two
  * unlabelled percentages in one corner is a readout you have to think about.
@@ -134,7 +298,7 @@ function ChargeGauge({
       <Text style={styles.meta} allowFontScaling={false}>
         bat
       </Text>
-      {/* One Text, so the cells butt together the way the volume bar's do
+      {/* One Text, so the cells butt together the way the bars above do
           rather than picking up the tiny type's letter spacing. */}
       <Text style={styles.chargeCells} allowFontScaling={false}>
         <Text style={{ color: label.quaternary }}>[</Text>
@@ -152,77 +316,21 @@ function ChargeGauge({
 }
 
 /**
- * Now playing, over a volume bar you drag sideways.
+ * Now playing, over the levels this device can reach: its own volume, and the
+ * brightness of a room of Hue lights.
  *
- * The gesture is relative, not absolute: a swipe moves the level by how far
- * the finger travelled rather than jumping to wherever it landed. Absolute
- * positioning would make a stray tap on the bar slam the volume to that point,
- * which is the wrong behaviour for a device left sitting on a desk.
+ * Which rails appear is the caller's business. Whichever comes first carries
+ * the track name in its header, so the one line that is about the music rather
+ * than about a level stays at the top of the bar wherever the lights are put.
  */
 export function MediaBar({
   tone,
   volume,
-  controllable,
-  onChange,
-  onDragChange,
+  lights,
   nowPlaying,
   onControl,
   battery,
 }: Props) {
-  const [cells, setCells] = useState(MIN_CELLS);
-  const [width, setWidth] = useState(0);
-
-  // Read inside the responder without re-creating it on every level change.
-  const levelRef = useRef(volume);
-  levelRef.current = volume;
-  const widthRef = useRef(0);
-  widthRef.current = width;
-  const startLevel = useRef(volume);
-  const lastFilled = useRef(-1);
-
-  const onLayout = (event: LayoutChangeEvent) => {
-    const available = event.nativeEvent.layout.width;
-    setWidth(available);
-    // Two cells go to the enclosing brackets.
-    setCells(Math.max(MIN_CELLS, Math.floor(available / (FONT * MONO_ASPECT)) - 2));
-  };
-
-  const responder = useMemo(
-    () =>
-      PanResponder.create({
-        // Not on touch-down, which would swallow every tap on the transport
-        // keys below before they saw it. Nothing happens on the press anyway:
-        // the level is only read when the finger starts moving, so waiting for
-        // movement costs the gesture nothing and gives the keys their taps.
-        onStartShouldSetPanResponder: () => false,
-        onMoveShouldSetPanResponder: (_, gesture) =>
-          // Claim the gesture only once it is clearly horizontal, so a vertical
-          // swipe still belongs to whatever is behind the bar.
-          Math.abs(gesture.dx) > Math.abs(gesture.dy),
-        onPanResponderGrant: () => {
-          startLevel.current = levelRef.current;
-          lastFilled.current = -1;
-          onDragChange(true);
-        },
-        onPanResponderMove: (_, gesture) => {
-          const span = widthRef.current;
-          if (span <= 0) return;
-          onChange(clampVolume(startLevel.current + gesture.dx / span));
-        },
-        onPanResponderRelease: () => onDragChange(false),
-        onPanResponderTerminate: () => onDragChange(false),
-      }),
-    [onChange, onDragChange],
-  );
-
-  const filled = Math.round(clampVolume(volume) * cells);
-
-  // One tick per cell crossed, the way a physical volume wheel detents.
-  if (lastFilled.current !== -1 && filled !== lastFilled.current) {
-    Haptics.selectionAsync().catch(() => {});
-  }
-  lastFilled.current = filled;
-
   const track = nowPlaying?.track ?? null;
 
   /*
@@ -244,40 +352,37 @@ export function MediaBar({
         ? '[no source]'
         : null;
 
+  const heading = `${trackLine(track)}${source ? `  ${source}` : ''}`;
+
   return (
-    <View style={styles.block} onLayout={onLayout} {...responder.panHandlers}>
+    <View style={styles.block}>
       <View style={styles.rule} />
 
-      <View style={styles.row}>
-        <Text style={styles.title} numberOfLines={1}>
-          {trackLine(nowPlaying?.track ?? null)}
-        </Text>
-        <Text
-          style={[styles.level, { color: tone.color }]}
-          allowFontScaling={false}
-        >
-          {formatVolume(volume)}
-        </Text>
-      </View>
+      {volume && (
+        <Rail
+          tone={tone}
+          state={volume}
+          title={heading}
+          hint={volume.controllable ? 'swipe to adjust' : 'volume unavailable'}
+          caption="volume"
+        />
+      )}
 
-      <Text style={styles.bar} allowFontScaling={false} numberOfLines={1}>
-        <Text style={{ color: label.quaternary }}>[</Text>
-        <Text style={{ color: tone.color }}>{FILL.repeat(filled)}</Text>
-        <Text style={{ color: label.quaternary }}>
-          {EMPTY.repeat(Math.max(0, cells - filled))}
-        </Text>
-        <Text style={{ color: label.quaternary }}>]</Text>
-      </Text>
-
-      <View style={styles.row}>
-        <Text style={styles.meta} numberOfLines={1}>
-          {controllable ? 'swipe to adjust' : 'volume unavailable'}
-          {source ? `  ${source}` : ''}
-        </Text>
-        <Text style={styles.meta} allowFontScaling={false}>
-          volume
-        </Text>
-      </View>
+      {lights && (
+        <Rail
+          tone={tone}
+          state={lights}
+          // The track line belongs to the first rail on the bar, whichever
+          // that turns out to be.
+          title={volume ? '' : heading}
+          // The room name rather than "swipe to adjust": with two rails the
+          // gesture has already been explained once, and which lights this is
+          // driving is the thing worth a line.
+          hint={lights.problem ?? lights.name}
+          caption="lights"
+          spaced={volume !== null}
+        />
+      )}
 
       {/*
         Both halves share one row: the keys sit on the left and the charge is
@@ -346,6 +451,7 @@ const styles = StyleSheet.create({
   title: { ...type.small, color: label.primary, flexShrink: 1 },
   level: { ...type.small },
   bar: { fontFamily: mono, fontSize: FONT, lineHeight: FONT * 1.3 },
+  spaced: { marginTop: space.sm },
   meta: { ...type.tiny, color: label.tertiary, flexShrink: 1 },
   bottom: { flexDirection: 'row', alignItems: 'center', paddingTop: space.xs },
   transport: { flexDirection: 'row', gap: space.lg },

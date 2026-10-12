@@ -18,7 +18,3 @@ export const VOLUME_STEP = 0.05;
 export function clampVolume(level: number): number {
   return clamp01(level);
 }
-
-export function formatVolume(level: number): string {
-  return `${Math.round(clampVolume(level) * 100)}%`;
-}
