@@ -33,6 +33,12 @@ export interface SourceChoice {
 
 const IOS_REASON = 'ios does not expose other apps’ now playing';
 const WEB_REASON = 'browsers cannot read system media sessions';
+/**
+ * Android, with the listener excluded from the build — which is every release
+ * so far. Without this the fallthrough below told someone holding a phone that
+ * browsers cannot read media sessions.
+ */
+const ANDROID_REASON = 'reading this device is not in this release';
 
 function endpointChoice(detail: string): SourceChoice {
   return { kind: 'endpoint', reason: detail, needsPermission: false };
@@ -65,7 +71,12 @@ export function chooseSource(endpoint: string, granted: boolean): SourceChoice {
 
   return {
     kind: 'unavailable',
-    reason: Platform.OS === 'ios' ? IOS_REASON : WEB_REASON,
+    reason:
+      Platform.OS === 'ios'
+        ? IOS_REASON
+        : Platform.OS === 'android'
+          ? ANDROID_REASON
+          : WEB_REASON,
     needsPermission: false,
   };
 }

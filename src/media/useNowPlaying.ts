@@ -71,11 +71,22 @@ export function useNowPlaying(endpoint: string, enabled: boolean) {
 
   const refresh = useCallback(() => {
     if (!enabled) return;
-    const token = ++generation.current;
 
     const nowGranted = hasNotificationAccess();
     setGranted(nowGranted);
 
+    /*
+      Nothing to read from: no endpoint typed, and no access to the device's
+      own media sessions. Asking anyway was a round trip and a re-render of
+      the whole clock every five seconds, for ever, to be told the same thing
+      each time — and this is an app that sits on a charger for days.
+    */
+    if (!settled && !nowGranted) {
+      setResult(null);
+      return;
+    }
+
+    const token = ++generation.current;
     loadNowPlaying(settled, nowGranted)
       .then((next) => {
         if (token === generation.current) setResult(next);
@@ -108,6 +119,9 @@ export function useNowPlaying(endpoint: string, enabled: boolean) {
     [enabled, refresh],
   );
 
+  /** Whether there is anything on the other end worth asking. */
+  const readable = settled !== '' || granted;
+
   useEffect(() => {
     if (!enabled) {
       setResult(null);
@@ -115,10 +129,17 @@ export function useNowPlaying(endpoint: string, enabled: boolean) {
     }
 
     refresh();
-    const timer = setInterval(refresh, REFRESH_MS);
+
+    // Watched even when there is nothing to poll: notification access is
+    // granted in Android's own settings, and coming back to the foreground is
+    // the only moment this can notice that it happened.
     const subscription = AppState.addEventListener('change', (status) => {
       if (status === 'active') refresh();
     });
+
+    if (!readable) return () => subscription.remove();
+
+    const timer = setInterval(refresh, REFRESH_MS);
 
     return () => {
       generation.current += 1;
@@ -126,7 +147,7 @@ export function useNowPlaying(endpoint: string, enabled: boolean) {
       clearTimeout(settle.current);
       subscription.remove();
     };
-  }, [refresh, enabled]);
+  }, [refresh, enabled, readable]);
 
   return { result, source, refresh, control };
 }

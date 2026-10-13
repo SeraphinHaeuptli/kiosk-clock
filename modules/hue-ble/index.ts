@@ -54,7 +54,6 @@ interface HueBleNative {
   disconnect(): boolean;
   state(): LampsState;
   request(on: boolean | null, brightness: number | null): boolean;
-  refresh(): boolean;
   addListener(
     event: 'onLamps',
     listener: (state: LampsState) => void,
@@ -157,14 +156,6 @@ export function requestLamps(
     return native?.request(on, brightness) ?? false;
   } catch {
     return false;
-  }
-}
-
-export function refreshLamps(): void {
-  try {
-    native?.refresh();
-  } catch {
-    // Nothing connected to refresh.
   }
 }
 

@@ -137,9 +137,9 @@ ${RULES_BEGIN}
 
 # Libraries that ship no consumer rules of their own.
 #
-# react-native, expo-modules-core, react-native-reanimated,
-# react-native-worklets and react-native-svg all declare consumerProguardFiles,
-# so their rules arrive with them and are not repeated here. These five do not,
+# react-native, expo-modules-core, react-native-reanimated and
+# react-native-worklets all declare consumerProguardFiles, so their rules
+# arrive with them and are not repeated here. These five do not,
 # and all five are reached from JNI or from the generated package list rather
 # than from ordinary call sites, which is what R8 cannot see.
 -keep class com.swmansion.gesturehandler.** { *; }

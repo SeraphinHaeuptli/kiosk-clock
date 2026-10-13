@@ -57,23 +57,6 @@ export function longDate(date: Date): string {
   return `${WEEKDAYS[date.getDay()]}, ${MONTHS[date.getMonth()]} ${date.getDate()}`;
 }
 
-export function shortDate(date: Date): string {
-  return `${WEEKDAYS[date.getDay()].slice(0, 3)} ${date.getDate()}`;
-}
-
-/** "2h 14m", "48m", or "under a minute" for a span given in milliseconds. */
-export function formatDuration(ms: number): string {
-  const totalMinutes = Math.floor(Math.max(0, ms) / 60_000);
-  if (totalMinutes < 1) return 'under a minute';
-
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-
-  if (hours === 0) return `${minutes}m`;
-  if (minutes === 0) return `${hours}h`;
-  return `${hours}h ${minutes}m`;
-}
-
 export function formatPercent(fraction: number): string {
   return `${Math.round(clamp01(fraction) * 100)}%`;
 }

@@ -468,6 +468,44 @@ entirely remain the obvious way for this to be unavailable elsewhere.
 
 ---
 
+## What runs while it sits on a charger
+
+This is an app whose whole job is to be left alone for days, so what wakes up
+matters more than what it costs once. With nothing configured, the answer is:
+
+| What | How often | When |
+|---|---|---|
+| The clock | once a minute | always — once a second only with seconds showing or an analog face |
+| The burn-in drift | a sub-pixel step every 6s | while it is on |
+| Weather | every 30 minutes | only once a place is set |
+| Now playing | every 5 seconds | **only when there is a source** |
+| Hue bridge | every 30 seconds | only when a bridge is paired |
+| Hue lamps | nothing polled | the lamps report changes themselves |
+| Battery | nothing polled | Android reports threshold crossings |
+
+Two of those lines used to be worse, and both were found by looking rather
+than by thinking:
+
+- **Now playing polled every five seconds whether or not there was anything to
+  poll.** With no endpoint typed and the device listener excluded from the
+  build — which is every release so far — that was seventeen thousand round
+  trips a day, each re-rendering the whole clock, to be told "nothing playing"
+  again. It now polls only when there is a source, and still watches for the
+  app returning to the foreground, because that is when notification access
+  granted in system settings can first be noticed.
+- **The burn-in guard was a continuous `Animated.loop`.** Native-driven, so the
+  JS thread was idle, but it composited a frame on every vsync for as long as
+  the clock was on screen. A static screen is otherwise something the platform
+  can leave alone entirely. It now steps the offset every six seconds instead,
+  which moves the clock by well under a pixel at a time — invisible, the same
+  protection, and the display pipeline sleeps in between.
+
+The same reasoning retired `react-native-svg`: a native library compiled into
+every APK that nothing in this app imports and no installed package needs at
+runtime.
+
+---
+
 ## Security posture
 
 What this app can reach, and what it deliberately cannot.

@@ -297,15 +297,6 @@ internal class LampLink(
     }
   }
 
-  /** Read everything again, for a caller that suspects it has gone stale. */
-  fun refresh() {
-    main.post {
-      if (closed || !connected) return@post
-      enqueue(readOf(UUID_POWER))
-      enqueue(readOf(UUID_BRIGHTNESS))
-    }
-  }
-
   private fun accept(uuid: UUID, value: ByteArray?) {
     if (value == null || value.isEmpty()) return
     when (uuid) {

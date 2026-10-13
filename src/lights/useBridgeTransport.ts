@@ -178,7 +178,10 @@ export function useBridgeTransport(
       if (result.ok) {
         setLevel(fromGroupState(result.value));
         setKnown(true);
-        setStatus({ kind: 'live' });
+        // Kept identical when it already said live: a fresh object every
+        // thirty seconds re-renders the clock behind it for nothing, and this
+        // poll runs for as long as the phone sits on the charger.
+        setStatus((current) => (current.kind === 'live' ? current : { kind: 'live' }));
       } else {
         setStatus({ kind: 'failed', reason: result.reason });
       }

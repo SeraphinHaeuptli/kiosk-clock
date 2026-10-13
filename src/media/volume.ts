@@ -13,8 +13,6 @@ export interface VolumeState {
   controllable: boolean;
 }
 
-export const VOLUME_STEP = 0.05;
-
 export function clampVolume(level: number): number {
   return clamp01(level);
 }

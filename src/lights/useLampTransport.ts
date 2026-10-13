@@ -88,7 +88,10 @@ export function useLampTransport(
         return;
       }
 
-      setStatus({ kind: 'live' });
+      // Same object while nothing has changed: a lamp reports its state
+      // whenever anything touches it, and a new status object each time would
+      // re-render the clock for an event that moved nothing.
+      setStatus((current) => (current.kind === 'live' ? current : { kind: 'live' }));
       setKnown(true);
       // Never under the finger: a notification carrying the level from before
       // the drag would drag the bar backwards mid-gesture.

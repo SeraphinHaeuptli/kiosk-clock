@@ -284,12 +284,6 @@ class HueBleModule : Module() {
       true
     }
 
-    /** Read the lamps again, for a caller that suspects the state is stale. */
-    Function("refresh") {
-      for (lamp in synchronized(lock) { lamps.values.toList() }) lamp.refresh()
-      true
-    }
-
     OnDestroy {
       forget()
     }

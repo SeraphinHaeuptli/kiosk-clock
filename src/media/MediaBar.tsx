@@ -352,7 +352,16 @@ export function MediaBar({
         ? '[no source]'
         : null;
 
-  const heading = `${trackLine(track)}${source ? `  ${source}` : ''}`;
+  /*
+    A bar with no source says nothing about playback, rather than holding a
+    permanent "nothing playing [no source]" over a volume slider. Someone who
+    has not set an endpoint is not waiting to be told that every day — and on
+    a docked phone that line is on screen for weeks.
+  */
+  const heading =
+    nowPlaying === null
+      ? ''
+      : `${trackLine(track)}${source ? `  ${source}` : ''}`;
 
   return (
     <View style={styles.block}>
@@ -363,7 +372,10 @@ export function MediaBar({
           tone={tone}
           state={volume}
           title={heading}
-          hint={volume.controllable ? 'swipe to adjust' : 'volume unavailable'}
+          // Silent while it works. "swipe to adjust" is read once and then
+          // sits there for the life of the device; what is worth a line is
+          // the case where the bar cannot drive anything.
+          hint={volume.controllable ? '' : 'volume unavailable'}
           caption="volume"
         />
       )}

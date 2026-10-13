@@ -136,10 +136,18 @@ export function KioskScreen() {
     resolveNowPlayingEndpoint(settings.nowPlayingEndpoint),
     settings.showMedia,
   );
-  const volume = useVolume(settings.showMedia);
-  // The bar is where the slider goes, so there is nothing to drive when the
-  // bar is not on screen.
-  const lights = useLights(settings.showMedia && settings.lights !== 'off');
+  const lights = useLights(settings.lights !== 'off');
+
+  /**
+   * Whether the volume half of the bar is on screen.
+   *
+   * Two things can take it away: switching the audio bar off, and asking the
+   * lights to stand in its place — the second only when there are lights that
+   * actually answered, so the bar is never left with no slider on it at all.
+   */
+  const showVolume =
+    settings.showMedia && !(settings.lights === 'instead' && lights.shown);
+  const volume = useVolume(showVolume);
   const weather = useWeather(settings.weatherPlace, settings.showWeather);
   // Either readout brings the subscription up; neither leaves it down.
   const battery = useBattery(settings.showBattery || settings.showBatteryMeter);
@@ -476,28 +484,27 @@ export function KioskScreen() {
           </BurnInGuard>
         )}
 
-        {settings.showMedia && (
+        {/*
+          Either half brings the bar up. They were tied together until the
+          lights arrived, which meant someone who wanted a brightness slider
+          and no volume could not have one — and switching the audio bar off
+          silently took the lights with it.
+        */}
+        {(settings.showMedia || lights.shown) && (
           // Interactive, unlike the rest of the face: the bar has to receive
           // the swipe rather than let it fall through to the reveal tap.
           <Animated.View style={[styles.meter, { opacity: dim }]}>
             <MediaBar
               tone={tone}
-              /*
-                'instead' only takes the volume away when there is actually a
-                brightness bar to put in its place. Hiding it for a setting
-                whose bridge has never been paired would leave the bar with no
-                slider on it at all, which reads as a broken release rather
-                than as an unfinished setup.
-              */
               volume={
-                settings.lights === 'instead' && lights.shown
-                  ? null
-                  : {
+                showVolume
+                  ? {
                       level: volume.level,
                       controllable: volume.controllable,
                       onChange: volume.set,
                       onDragChange: volume.setDragging,
                     }
+                  : null
               }
               lights={
                 lights.shown
