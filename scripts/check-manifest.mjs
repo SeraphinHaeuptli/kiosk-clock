@@ -83,6 +83,12 @@ const REQUIRED_STRINGS = [
   ['android:showWhenLocked="true"', 'the clock being allowed above the lock screen'],
   ['android:turnScreenOn="true"', 'starting it waking the display'],
   [
+    'expo.modules.hueble.HueWidget',
+    'the home screen widget — without the receiver in the merged manifest the' +
+      ' widget simply never appears in the launcher\'s list, which looks like' +
+      ' a feature that was never built rather than one that was lost',
+  ],
+  [
     'android:usesPermissionFlags="neverForLocation"',
     'the promise that a bluetooth scan is never used to work out where the' +
       ' phone is — the thing that keeps this app free of a location' +

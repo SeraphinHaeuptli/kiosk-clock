@@ -19,6 +19,26 @@
 <manifest
   xmlns:android="http://schemas.android.com/apk/res/android">
 
+  <application>
+    <!--
+      The home screen widget. Exported because the launcher is what starts it,
+      which is the whole point; the custom actions it sends itself name this
+      class explicitly rather than travelling by filter, so nothing else on the
+      device can ask it to touch a lamp.
+    -->
+    <receiver
+      android:name="expo.modules.hueble.HueWidget"
+      android:exported="true"
+      android:label="@string/hue_widget_label">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/hue_widget_info" />
+    </receiver>
+  </application>
+
   <!-- Optional: a phone without Bluetooth LE installs and runs fine, minus
        this one feature. Declaring it required would keep the clock off those
        devices entirely, which is the wrong trade for a lamp dimmer. -->

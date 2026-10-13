@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Four cells by one, resizable sideways. updatePeriodMillis is zero on
+  purpose: a periodic update is at best half-hourly, which is no use for a
+  light switch, and this redraws itself whenever it is tapped or the app
+  changes something.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+  android:description="@string/hue_widget_description"
+  android:initialLayout="@layout/hue_widget"
+  android:minWidth="250dp"
+  android:minHeight="40dp"
+  android:previewLayout="@layout/hue_widget"
+  android:resizeMode="horizontal"
+  android:targetCellWidth="4"
+  android:targetCellHeight="1"
+  android:updatePeriodMillis="0"
+  android:widgetCategory="home_screen" />

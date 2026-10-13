@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="hue_widget_label">Kiosk lights</string>
+  <string name="hue_widget_description">Dim your Philips Hue lamps from the home screen.</string>
+  <string name="hue_widget_down">−</string>
+  <string name="hue_widget_up">+</string>
+  <string name="hue_widget_on">on</string>
+  <string name="hue_widget_off">off</string>
+</resources>

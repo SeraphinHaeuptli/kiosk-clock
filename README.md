@@ -112,7 +112,8 @@ tomorrow. **Now playing** read from the device's own media session, or from an
 HTTPS endpoint you point it at. **A volume bar** you drag sideways — relative,
 not absolute, so a stray tap cannot slam the level. **Philips Hue
 brightness** on a second bar beside it, or in its place — over Bluetooth
-straight to the lamps, or through a bridge if you have one. **Shuffle**, a new look
+straight to the lamps, or through a bridge if you have one, with a home screen
+widget that dims them without opening the app. **Shuffle**, a new look
 every quarter hour, hour or day. **Presets** — name a look and come back to it.
 And a line under the date carrying a second time zone, a countdown and the
 battery.

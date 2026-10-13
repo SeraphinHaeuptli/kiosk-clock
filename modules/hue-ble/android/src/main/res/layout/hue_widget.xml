@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  One row, four targets: dimmer, the level, brighter, and the switch. Only the
+  handful of views RemoteViews accepts are used — a home screen widget cannot
+  hold a real slider, so stepping is the control that fits.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:background="@drawable/hue_widget_background"
+  android:gravity="center_vertical"
+  android:orientation="horizontal"
+  android:paddingHorizontal="6dp"
+  android:paddingVertical="4dp">
+
+  <TextView
+    android:id="@+id/hue_widget_down"
+    android:layout_width="wrap_content"
+    android:layout_height="match_parent"
+    android:contentDescription="@string/hue_widget_down"
+    android:fontFamily="monospace"
+    android:gravity="center"
+    android:minWidth="44dp"
+    android:text="@string/hue_widget_down"
+    android:textColor="#FFFFFF"
+    android:textSize="18sp" />
+
+  <TextView
+    android:id="@+id/hue_widget_level"
+    android:layout_width="0dp"
+    android:layout_height="match_parent"
+    android:layout_weight="1"
+    android:ellipsize="end"
+    android:fontFamily="monospace"
+    android:gravity="center"
+    android:maxLines="1"
+    android:text="@string/hue_widget_label"
+    android:textColor="#FFFFFF"
+    android:textSize="16sp" />
+
+  <TextView
+    android:id="@+id/hue_widget_up"
+    android:layout_width="wrap_content"
+    android:layout_height="match_parent"
+    android:contentDescription="@string/hue_widget_up"
+    android:fontFamily="monospace"
+    android:gravity="center"
+    android:minWidth="44dp"
+    android:text="@string/hue_widget_up"
+    android:textColor="#FFFFFF"
+    android:textSize="18sp" />
+
+  <TextView
+    android:id="@+id/hue_widget_power"
+    android:layout_width="wrap_content"
+    android:layout_height="match_parent"
+    android:fontFamily="monospace"
+    android:gravity="center"
+    android:minWidth="52dp"
+    android:text="@string/hue_widget_off"
+    android:textColor="#B3FFFFFF"
+    android:textSize="13sp" />
+</LinearLayout>

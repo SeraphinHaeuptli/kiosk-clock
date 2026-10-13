@@ -165,7 +165,7 @@ on android the track can come from the device itself, and that needs notificatio
 
 philips hue, on the same bar
 
-a brightness slider for your hue lights, beside the volume bar or in its place. no bridge needed: hue lamps made since about 2019 have bluetooth in them, and the phone talks to them directly. a bridge works too, if you have one. no hue account, no cloud, and nothing to sign in to.
+a brightness slider for your hue lights, beside the volume bar or in its place, and a home screen widget that dims them without opening the app. no bridge needed: hue lamps made since about 2019 have bluetooth in them, and the phone talks to them directly. a bridge works too, if you have one. no hue account, no cloud, and nothing to sign in to.
 
 a line under the date
 

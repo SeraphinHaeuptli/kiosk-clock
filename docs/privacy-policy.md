@@ -35,6 +35,17 @@ There are exactly five things stored, under these keys:
 | `kiosk.founder.test.v1` | A single true/false flag recording whether the Founder pack is unlocked on this device. |
 | `kiosk.lights.v1` | Written only if you set up Philips Hue lights, and holding one of two things. For **lamps over Bluetooth**: the Bluetooth address of each lamp you picked and the name it reports. For **a bridge**: its local address and id, the application key it issued to this phone, the fingerprint of the certificate it presented, and the id and name of the room you chose. The key is a local credential — it dims lights on your own network, it carries no account and no payment, and the bridge can be made to forget it. Neither is sent anywhere except to the lamp or bridge it belongs to. |
 
+Two small things live outside that list, in Android's shared preferences
+rather than in `AsyncStorage`, because they have to be readable when none of
+the app is running:
+
+| File | What is in it | Who reads it |
+|---|---|---|
+| `kiosk.dock` | The three dock switches: whether the screen saver should open the clock, wireless only, landscape only. | The screen saver, which Android starts while the phone is locked. |
+| `kiosk.lights` | The Bluetooth address of each lamp you picked, what to call them, and the brightness this app last asked for. | The home screen widget, which runs with the app closed. |
+
+Neither contains anything about you, and neither is transmitted anywhere.
+
 Android's own backup is switched off for this app (`allowBackup="false"` in
 the manifest), so none of the above is copied to Google Drive or restored onto
 a different device.
@@ -142,9 +153,10 @@ one of all: it does not use the network at all, and is described after them.
 
 ### 6. Your own Hue lamps, over Bluetooth
 
-- **When:** only after you have picked lamps in Settings → lights, and only
-  while the app is in the foreground. Leaving the app drops the connections;
-  coming back takes them again.
+- **When:** only after you have picked lamps in Settings → lights. While the
+  app is open it holds the connections and drops them when you leave; the home
+  screen widget borrows them for a few seconds when you tap it and lets them go
+  about half a minute later.
 - **Where:** a radio link from the phone to each lamp, in the same room. No
   network, no router, no internet, no Philips. A lamp cannot relay anything
   anywhere: it is a light bulb.

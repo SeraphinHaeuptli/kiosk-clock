@@ -245,11 +245,55 @@ to be in the room. Bluetooth is the bridgeless path, and it has real limits —
 ten lamps, line-of-room range, and a lamp that is off at the wall is simply
 not there.
 
+### The home screen widget
+
+A four-by-one widget: dimmer, the level, brighter, and a switch. Tapping the
+level opens the app, which is where the real slider and the setup live.
+
+**Why stepping rather than a slider.** `RemoteViews` is the only thing a
+widget may draw with, and it has no slider on any Android version. Four
+targets in a row is what fits.
+
+**Why it can work at all with the app closed.** Two things had to be true, and
+both are:
+
+- Android's own documentation says there is *no* restriction on connecting
+  over Bluetooth from the background — only on starting activities and
+  services. The connection dies with the process, which is why the work
+  happens before the receiver finishes.
+- A broadcast receiver may run for about ten seconds before the system calls
+  it unresponsive, and `goAsync` is the documented way to use that window off
+  the main thread. A tap connects, writes, waits three seconds for the lamp to
+  answer, redraws and finishes.
+
+**What that forced.** The connections used to live inside the Expo module,
+which does not exist when the app is closed, so they now live in a
+process-wide registry that both the module and the widget use — one set of
+connections however many things are asking. The app holds them for as long as
+a bar is on screen; the widget borrows them and they close thirty seconds
+later unless the app is holding. The chosen lamps are mirrored into shared
+preferences, the same trick the screen saver uses, because the widget has no
+JavaScript to ask.
+
+**One bug this found before any hardware did.** A tap with the app closed
+queued the write against a lamp that had not finished connecting, where it
+failed to start and was dropped. The lamp link now holds anything asked for
+while it was still connecting and applies it the moment the services land —
+which is the normal case for a widget, and never happens when the app is
+already open.
+
+**The optimistic redraw is deliberate.** The widget shows what was asked for
+immediately and corrects itself three seconds later from what the lamps
+actually say. A home screen button that waits a second and a half to
+acknowledge a press feels broken even when it worked.
+
 ### Not verified against a real lamp
 
-No lamp has ever answered this code. What was verified: picking lamps, both
-slider placements, the failure text, and the exact bytes the writes carry —
-all against a stub, in a browser, with screenshots. What that cannot prove is
+No lamp has ever answered this code, and no launcher has ever drawn the
+widget — a widget cannot be rendered in a browser at all, so it has only been
+compiled. What was verified: picking lamps, both slider placements, the
+failure text, and the exact bytes the writes carry — all against a stub, in a
+browser, with screenshots. What that cannot prove is
 anything about how a real lamp behaves: whether the existing bond is reusable,
 whether a given model exposes these characteristics, or how the Hue app and
 this one share a lamp when both are on the same phone.

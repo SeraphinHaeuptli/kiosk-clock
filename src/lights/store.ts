@@ -2,7 +2,15 @@ import { useEffect, useState } from 'react';
 
 import { asyncStorageAdapter, jsonSlot } from '@/core/storage';
 
-import { decodeSource, type BridgeLink, type Lamp, type LightsSource } from './lights';
+import { rememberLamps } from '../../modules/hue-ble';
+
+import {
+  decodeSource,
+  lampsName,
+  type BridgeLink,
+  type Lamp,
+  type LightsSource,
+} from './lights';
 
 /**
  * The one set of lights this phone drives, shared by everything that asks.
@@ -57,10 +65,17 @@ async function save(source: LightsSource): Promise<void> {
 }
 
 export function saveBridge(bridge: BridgeLink): Promise<void> {
+  // A bridge is not something the widget can drive, so it stops offering to.
+  rememberLamps([], '');
   return save({ kind: 'bridge', bridge });
 }
 
 export function saveLamps(lamps: Lamp[]): Promise<void> {
+  // Mirrored for the home screen widget, which has no other way to know.
+  rememberLamps(
+    lamps.map((lamp) => lamp.address),
+    lampsName(lamps),
+  );
   return save({ kind: 'lamps', lamps });
 }
 
@@ -72,6 +87,7 @@ export function saveLamps(lamps: Lamp[]): Promise<void> {
  * this app. Both of those are done where they live, and settings says so.
  */
 export async function clearSource(): Promise<void> {
+  rememberLamps([], '');
   cached = null;
   loaded = true;
   announce();

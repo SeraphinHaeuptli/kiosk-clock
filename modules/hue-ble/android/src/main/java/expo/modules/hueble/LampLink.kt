@@ -116,6 +116,17 @@ internal class LampLink(
   private var powerQueued = false
   private var brightnessQueued = false
 
+  /**
+   * Set when something was asked for before this lamp was ready to be asked.
+   *
+   * The widget is the reason this exists: a tap on the home screen with the
+   * app closed arrives a second before the connection does, and the write
+   * would otherwise be queued against a lamp with no characteristics yet,
+   * fail its start, and be dropped on the floor. Held here and applied the
+   * moment the services land.
+   */
+  private var applyOnConnect = false
+
   /* -- The queue ----------------------------------------------------------- */
 
   private fun enqueue(operation: Operation) {
@@ -266,6 +277,7 @@ internal class LampLink(
       if (closed) return@post
       if (on != null) wantOn = on
       if (level != null) wantBrightness = level.coerceIn(MIN_BRIGHTNESS, MAX_BRIGHTNESS)
+      if (!connected) applyOnConnect = true
 
       if (wantOn != null && !powerQueued) {
         powerQueued = true
@@ -411,6 +423,14 @@ internal class LampLink(
         bondTried = false
         problem = null
         onChanged()
+
+        // Anything asked for while this was still connecting goes first: it
+        // is what somebody pressed, and the reads below are only the state it
+        // is about to overwrite anyway.
+        if (applyOnConnect) {
+          applyOnConnect = false
+          request(wantOn, wantBrightness)
+        }
 
         enqueue(readOf(UUID_LAMP_NAME))
         powerChar?.let {

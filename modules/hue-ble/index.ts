@@ -54,6 +54,7 @@ interface HueBleNative {
   disconnect(): boolean;
   state(): LampsState;
   request(on: boolean | null, brightness: number | null): boolean;
+  remember(addresses: string[], name: string): boolean;
   addListener(
     event: 'onLamps',
     listener: (state: LampsState) => void,
@@ -156,6 +157,21 @@ export function requestLamps(
     return native?.request(on, brightness) ?? false;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Mirror the chosen lamps somewhere the home screen widget can read them.
+ *
+ * The widget runs with the app closed — no JavaScript, nothing to ask — so
+ * this is the only way it knows which lamps it is for. Called from wherever
+ * the list is stored, so the two cannot drift apart.
+ */
+export function rememberLamps(addresses: string[], name: string): void {
+  try {
+    native?.remember(addresses, name);
+  } catch {
+    // No widget support in this build; nothing to mirror.
   }
 }
 

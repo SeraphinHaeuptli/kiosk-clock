@@ -5,10 +5,11 @@
  * Hue app drives up to ten of them that way with no bridge at all. This is the
  * same path: the phone connects straight to each lamp.
  *
- * What this module is responsible for: finding lamps, holding a connection to
- * each chosen one, and collapsing however many of them there are into the one
- * level a slider can show. The protocol itself, and the rules Android imposes
- * on a GATT connection, are in LampLink.
+ * What this module is responsible for: finding lamps, permissions, and the
+ * surface JavaScript talks to. The connections themselves belong to
+ * LampRegistry, one set per process, because the home screen widget drives the
+ * same lamps with none of this module alive. The protocol, and the rules
+ * Android imposes on a GATT connection, are in LampLink.
  *
  * Permissions are checked here and asked for from JavaScript, where there is a
  * screen to explain them on. Two of them prompt, which is new for this app —
@@ -47,15 +48,18 @@ private const val SCAN_SECONDS_MAX = 20
 @SuppressLint("MissingPermission")
 class HueBleModule : Module() {
   private val main = Handler(Looper.getMainLooper())
+  private var scanning: ScanCallback? = null
 
   /**
-   * Reached from three threads — the JS thread for a slider write, the async
-   * queue for connecting, the main looper for a state change — so every use
-   * of it is inside this lock.
+   * The connections themselves live in LampRegistry, one set per process,
+   * because the home screen widget drives the same lamps without any of this
+   * module existing. This is the listener that turns a change there into an
+   * event here.
    */
-  private val lamps = linkedMapOf<String, LampLink>()
-  private val lock = Any()
-  private var scanning: ScanCallback? = null
+  private val onChanged: () -> Unit = {
+    announce()
+    appContext.reactContext?.let { HueWidget.refresh(it) }
+  }
 
   private val context: Context
     get() = appContext.reactContext ?: throw HueBleException("no context")
@@ -83,23 +87,16 @@ class HueBleModule : Module() {
     (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
 
   private fun snapshot(): Map<String, Any?> {
-    val all = synchronized(lock) { lamps.values.toList() }
-    val live = all.filter { it.connected }
+    val state = LampRegistry.snapshot()
 
     return mapOf(
-      "total" to all.size,
-      "connected" to live.size,
-      // On if any of them is. The slider turns them on together, so the only
-      // way they disagree is if something else changed one of them.
-      "on" to live.any { it.on == true },
-      // The first lamp with a reading. With several, the slider sets them all
-      // to the same level, so the first one is the level — and if something
-      // else has moved one of them, following the first is at least a rule
-      // someone can predict.
-      "brightness" to live.firstOrNull { it.brightness != null }?.brightness,
-      "problem" to all.firstNotNullOfOrNull { it.problem },
+      "total" to state.total,
+      "connected" to state.connected,
+      "on" to state.on,
+      "brightness" to state.brightness,
+      "problem" to state.problem,
       "lamps" to
-        all.map {
+        state.lamps.map {
           mapOf(
             "address" to it.address,
             "name" to it.label,
@@ -119,19 +116,12 @@ class HueBleModule : Module() {
     }
   }
 
-  private fun forget() {
-    val all = synchronized(lock) {
-      val copy = lamps.values.toList()
-      lamps.clear()
-      copy
-    }
-    for (lamp in all) lamp.close()
-  }
-
   override fun definition() = ModuleDefinition {
     Name("HueBle")
 
     Events("onLamps")
+
+    OnCreate { LampRegistry.addListener(onChanged) }
 
     /** What this device can do, before anything is attempted on it. */
     Function("capabilities") {
@@ -233,44 +223,17 @@ class HueBleModule : Module() {
       if (missing().isNotEmpty()) {
         throw HueBleException("bluetooth permission has not been granted")
       }
-      val bluetooth = adapter() ?: throw HueBleException("this phone has no bluetooth")
-      if (!bluetooth.isEnabled) throw HueBleException("bluetooth is switched off")
 
       val wanted = addresses.distinct().take(MAX_LAMPS)
-
-      // Resolved before the lock is taken, because this is the step that can
-      // reject an address and nothing should be half-rearranged when it does.
-      val devices = wanted.map { address ->
-        address to
-          (runCatching { bluetooth.getRemoteDevice(address) }.getOrNull()
-            ?: throw HueBleException("$address is not an address this phone knows"))
+      if (!LampRegistry.holdForApp(context, wanted)) {
+        throw HueBleException("bluetooth is switched off")
       }
 
-      val dropped: List<LampLink>
-      val started: List<LampLink>
-      synchronized(lock) {
-        // Anything no longer on the list goes, so re-connecting with a changed
-        // list is the whole of the "I picked different lamps" case.
-        dropped = (lamps.keys.toList() - wanted.toSet()).mapNotNull { lamps.remove(it) }
-
-        started = devices.filterNot { (address, _) -> lamps.containsKey(address) }
-          .map { (address, device) ->
-            val lamp = LampLink(context, device) { announce() }
-            lamps[address] = lamp
-            lamp
-          }
-      }
-
-      for (lamp in dropped) lamp.close()
-      for (lamp in started) lamp.open()
-
-      announce()
       snapshot()
     }
 
     Function("disconnect") {
-      forget()
-      announce()
+      LampRegistry.releaseApp()
       true
     }
 
@@ -278,14 +241,27 @@ class HueBleModule : Module() {
 
     /** Set the lamps. A null leaves that half of the state alone. */
     Function("request") { on: Boolean?, brightness: Int? ->
-      val all = synchronized(lock) { lamps.values.toList() }
-      if (all.isEmpty()) return@Function false
-      for (lamp in all) lamp.request(on, brightness)
+      if (LampRegistry.snapshot().total == 0) return@Function false
+      LampRegistry.request(context, on, brightness)
+      true
+    }
+
+    /**
+     * Mirror which lamps were chosen somewhere the widget can read them.
+     *
+     * The home screen runs with the app closed, so this is the only way the
+     * widget knows what to drive. Called from the same place that stores the
+     * list on the JavaScript side.
+     */
+    Function("remember") { addresses: List<String>, name: String ->
+      LampStore.remember(context, addresses.distinct().take(MAX_LAMPS), name)
+      HueWidget.refresh(context)
       true
     }
 
     OnDestroy {
-      forget()
+      LampRegistry.removeListener(onChanged)
+      LampRegistry.releaseApp()
     }
   }
 }
